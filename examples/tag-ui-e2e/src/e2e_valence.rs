@@ -68,7 +68,7 @@ async fn seed_user(id: &str, email_verified: bool, valence: &Valence) {
         now,
     )
     .expect("build user");
-    User::upsert_used(id, user, valence, valence::use_!("upsert User in tag-ui-e2e/src/e2e_valence.rs; Valence persistence for this feature path; typed store; visible to test harness.")).await.expect("upsert user");
+    User::upsert_used(id, user, valence, valence::use_!(r#"**Test:** Fixture **User** save for `e2e_valence` so the suite can arrange and assert persistence behavior. CI and developers running the suite only."#)).await.expect("upsert user");
 }
 
 /// Build shared Valence/Higgs once and seed baseline catalog fixtures.

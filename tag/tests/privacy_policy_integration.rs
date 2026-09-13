@@ -35,7 +35,7 @@ async fn tag_history_create_defers_to_tag_update_owner_happy() {
         Some(RecordId::new("user", TEST_USER_A)),
     )
     .expect("build");
-    TagHistory::create_used(row, &v, valence::use_!("create TagHistory in tag/tests/privacy_policy_integration.rs; Valence persistence for this feature path; typed store; visible to test harness."))
+    TagHistory::create_used(row, &v, valence::use_!(r#"**Test:** Fixture **Tag History** save for `tests` so the suite can arrange and assert persistence behavior. CI and developers running the suite only."#))
         .await
         .expect("owner may create history via defer→Tag Update");
 }
@@ -67,7 +67,7 @@ async fn tag_history_create_non_owner_forge_denied_sad() {
         Some(RecordId::new("user", TEST_USER_A)),
     )
     .expect("build forged row");
-    let forge_attempt = TagHistory::create_used(forged, &outsider_v, valence::use_!("create TagHistory in tag/tests/privacy_policy_integration.rs; Valence persistence for this feature path; typed store; visible to test harness.")).await;
+    let forge_attempt = TagHistory::create_used(forged, &outsider_v, valence::use_!(r#"**Test:** Fixture **Tag History** save for `tests` so the suite can arrange and assert persistence behavior. CI and developers running the suite only."#)).await;
     assert!(
         forge_attempt.is_err(),
         "outsider TagHistory::create must fail without Tag Update"
@@ -217,7 +217,7 @@ async fn tag_history_delete_non_owner_denied_sad() {
         })
         .expect("history id");
 
-    let err = TagHistory::delete_used(&hist_id, &outsider_v, valence::use_!("delete TagHistory in tag/tests/privacy_policy_integration.rs; Valence persistence for this feature path; typed store; visible to test harness.")).await;
+    let err = TagHistory::delete_used(&hist_id, &outsider_v, valence::use_!(r#"**Test:** Fixture **Tag History** remove for `tests` so the suite can arrange and assert persistence behavior. CI and developers running the suite only."#)).await;
     assert!(
         err.is_err(),
         "outsider must not delete tag_history without Tag Delete"

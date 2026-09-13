@@ -28,7 +28,7 @@ pub async fn create(input: TagCreateInput, v: &Valence) -> Result<TagDetailDto, 
     let id = Uuid::new_v4().to_string();
     let tag = Tag::new(input.name, input.taxonomy, input.description, now, now)
         .map_err(|e| TagError::service("create", e))?;
-    let created = Tag::upsert_used(&id, tag, v, valence::use_!("upsert Tag in tag/service/mod.rs; Valence persistence for this feature path; typed store; visible to session actor / service path."))
+    let created = Tag::upsert_used(&id, tag, v, valence::use_!(r#"When **service** needs to persist work, we **save Tag** so the next step in that feature can continue with the latest values. People and services allowed for **service** use this data for that workflow—not as a general export of unrelated personal fields."#))
         .await
         .map_err(|e| TagError::service("create", e))?;
     let field_changes = crate::generated::TagFieldChanges::compute(None, Some(&created));
@@ -54,11 +54,11 @@ pub async fn update(
     input: TagUpdateInput,
     v: &Valence,
 ) -> Result<TagDetailDto, TagError> {
-    let before = Tag::get_used(id, v, valence::use_!("get Tag in tag/service/mod.rs; Valence persistence for this feature path; typed store; visible to session actor / service path."))
+    let before = Tag::get_used(id, v, valence::use_!(r#"In **service**, we **load Tag** so the application can decide what to do next in this workflow. The result is used by **service** logic—not necessarily displayed on a page unless that feature’s UI shows it."#))
         .await
         .map_err(|e| TagError::service("update", e))?
         .ok_or_else(|| TagError::not_found(id))?;
-    let mut builder = crate::generated::TagMutable::get_used(id, v, valence::use_!("get TagMutable in tag/service/mod.rs; Valence persistence for this feature path; typed store; visible to session actor / service path."))
+    let mut builder = crate::generated::TagMutable::get_used(id, v, valence::use_!(r#"In **service**, we **update Tag Mutable** in place so saved changes apply on the next read. The same actors who can run **service** use the updated values; this step is not a silent copy to an external marketing system."#))
         .await
         .map_err(|e| TagError::service("update", e))?;
     if let Some(name) = input.name {
@@ -106,7 +106,7 @@ pub async fn update(
 /// `HistorySource` cascade can clear `tag_history` via delete `defer_to_edge`
 /// (parent Delete) — no System elevate.
 pub async fn delete(id: &str, v: &Valence) -> Result<(), TagError> {
-    let Some(before) = Tag::get_used(id, v, valence::use_!("get Tag in tag/service/mod.rs; Valence persistence for this feature path; typed store; visible to session actor / service path."))
+    let Some(before) = Tag::get_used(id, v, valence::use_!(r#"In **service**, we **load Tag** so the application can decide what to do next in this workflow. The result is used by **service** logic—not necessarily displayed on a page unless that feature’s UI shows it."#))
         .await
         .map_err(|e| TagError::service("delete", e))?
     else {
@@ -125,7 +125,7 @@ pub async fn delete(id: &str, v: &Valence) -> Result<(), TagError> {
         .on_mutation_with_tag_id(&mutation, Some(id))
         .await
         .map_err(|e| TagError::service("delete", e))?;
-    Tag::delete_used(id, v, valence::use_!("delete Tag in tag/service/mod.rs; Valence persistence for this feature path; typed store; visible to session actor / service path."))
+    Tag::delete_used(id, v, valence::use_!(r#"When **service** finishes cleanup, we **remove Tag** so leftover rows do not remain after the operation. Only the cleanup path for **service** uses this step; it is not shown as a standalone end-user page by itself."#))
         .await
         .map_err(|e| TagError::service("delete", e))?;
     Ok(())
@@ -133,7 +133,7 @@ pub async fn delete(id: &str, v: &Valence) -> Result<(), TagError> {
 
 /// Load a single tag by id as a [`TagDetailDto`], resolving its owner display label.
 pub async fn get(id: &str, v: &Valence) -> Result<Option<TagDetailDto>, TagError> {
-    let Some(tag) = Tag::get_used(id, v, valence::use_!("get Tag in tag/service/mod.rs; Valence persistence for this feature path; typed store; visible to session actor / service path."))
+    let Some(tag) = Tag::get_used(id, v, valence::use_!(r#"In **service**, we **load Tag** so the application can decide what to do next in this workflow. The result is used by **service** logic—not necessarily displayed on a page unless that feature’s UI shows it."#))
         .await
         .map_err(|e| TagError::service("get", e))?
     else {
@@ -150,7 +150,7 @@ pub async fn list(
     search: Option<String>,
     taxonomy: Option<String>,
 ) -> Result<Vec<TagRowDto>, TagError> {
-    let mut q = Tag::query_used(v, valence::use_!("query Tag in tag/service/mod.rs; Valence persistence for this feature path; typed store; visible to session actor / service path."));
+    let mut q = Tag::query_used(v, valence::use_!(r#"In **service**, we **list Tag** so the product can show or process the matching set for this workflow. Callers allowed for **service** use the list; it is not a public dump of every field to anonymous visitors."#));
     if let Some(term) = search.filter(|s| !s.trim().is_empty()) {
         q = q.where_name(StringPredicate::Contains(term));
     }
