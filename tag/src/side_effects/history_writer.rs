@@ -63,7 +63,7 @@ async fn append_row(
         Utc::now(),
         actor,
     )?;
-    if let Err(e) = TagHistory::create(row, valence).await {
+    if let Err(e) = TagHistory::create_used(row, valence, valence::use_!("create TagHistory in src/side_effects/history_writer.rs; Valence persistence for this feature path; typed store; visible to session actor / service path.")).await {
         log::warn!("tag history append failed: source={source} field={field_name}: {e}");
         return Err(e.into());
     }

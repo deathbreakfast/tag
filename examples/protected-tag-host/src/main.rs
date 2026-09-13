@@ -130,7 +130,7 @@ async fn seed_user(id: &str, email: &str, valence: &Valence) {
         now,
     )
     .expect("build user");
-    User::upsert(id, user, valence).await.expect("upsert user");
+    User::upsert_used(id, user, valence, valence::use_!("upsert User in protected-tag-host/src/main.rs; Valence persistence for this feature path; typed store; visible to session actor / service path.")).await.expect("upsert user");
 }
 
 async fn bootstrap_tags() -> HostState {

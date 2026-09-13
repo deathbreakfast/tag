@@ -28,7 +28,7 @@ pub async fn create(input: TagCreateInput, v: &Valence) -> Result<TagDetailDto, 
     let id = Uuid::new_v4().to_string();
     let tag = Tag::new(input.name, input.taxonomy, input.description, now, now)
         .map_err(|e| TagError::service("create", e))?;
-    let created = Tag::upsert(&id, tag, v)
+    let created = Tag::upsert_used(&id, tag, v, valence::use_!("upsert Tag in tag/service/mod.rs; Valence persistence for this feature path; typed store; visible to session actor / service path."))
         .await
         .map_err(|e| TagError::service("create", e))?;
     let field_changes = crate::generated::TagFieldChanges::compute(None, Some(&created));
@@ -54,11 +54,11 @@ pub async fn update(
     input: TagUpdateInput,
     v: &Valence,
 ) -> Result<TagDetailDto, TagError> {
-    let before = Tag::get(id, v)
+    let before = Tag::get_used(id, v, valence::use_!("get Tag in tag/service/mod.rs; Valence persistence for this feature path; typed store; visible to session actor / service path."))
         .await
         .map_err(|e| TagError::service("update", e))?
         .ok_or_else(|| TagError::not_found(id))?;
-    let mut builder = crate::generated::TagMutable::get(id, v)
+    let mut builder = crate::generated::TagMutable::get_used(id, v, valence::use_!("get TagMutable in tag/service/mod.rs; Valence persistence for this feature path; typed store; visible to session actor / service path."))
         .await
         .map_err(|e| TagError::service("update", e))?;
     if let Some(name) = input.name {
@@ -106,7 +106,7 @@ pub async fn update(
 /// `HistorySource` cascade can clear `tag_history` via delete `defer_to_edge`
 /// (parent Delete) — no System elevate.
 pub async fn delete(id: &str, v: &Valence) -> Result<(), TagError> {
-    let Some(before) = Tag::get(id, v)
+    let Some(before) = Tag::get_used(id, v, valence::use_!("get Tag in tag/service/mod.rs; Valence persistence for this feature path; typed store; visible to session actor / service path."))
         .await
         .map_err(|e| TagError::service("delete", e))?
     else {
@@ -125,7 +125,7 @@ pub async fn delete(id: &str, v: &Valence) -> Result<(), TagError> {
         .on_mutation_with_tag_id(&mutation, Some(id))
         .await
         .map_err(|e| TagError::service("delete", e))?;
-    Tag::delete(id, v)
+    Tag::delete_used(id, v, valence::use_!("delete Tag in tag/service/mod.rs; Valence persistence for this feature path; typed store; visible to session actor / service path."))
         .await
         .map_err(|e| TagError::service("delete", e))?;
     Ok(())
@@ -133,7 +133,7 @@ pub async fn delete(id: &str, v: &Valence) -> Result<(), TagError> {
 
 /// Load a single tag by id as a [`TagDetailDto`], resolving its owner display label.
 pub async fn get(id: &str, v: &Valence) -> Result<Option<TagDetailDto>, TagError> {
-    let Some(tag) = Tag::get(id, v)
+    let Some(tag) = Tag::get_used(id, v, valence::use_!("get Tag in tag/service/mod.rs; Valence persistence for this feature path; typed store; visible to session actor / service path."))
         .await
         .map_err(|e| TagError::service("get", e))?
     else {
@@ -150,7 +150,7 @@ pub async fn list(
     search: Option<String>,
     taxonomy: Option<String>,
 ) -> Result<Vec<TagRowDto>, TagError> {
-    let mut q = Tag::query(v);
+    let mut q = Tag::query_used(v, valence::use_!("query Tag in tag/service/mod.rs; Valence persistence for this feature path; typed store; visible to session actor / service path."));
     if let Some(term) = search.filter(|s| !s.trim().is_empty()) {
         q = q.where_name(StringPredicate::Contains(term));
     }
