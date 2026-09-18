@@ -7,7 +7,7 @@ authors.workspace = true
 repository.workspace = true
 homepage.workspace = true
 documentation.workspace = true
-description = "Shared tag catalog (Valence platform crate)"
+description = "Tag catalog domain for Unified Field hosts: Valence schemas and catalog APIs."
 
 [lints]
 workspace = true

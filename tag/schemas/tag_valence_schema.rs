@@ -5,6 +5,7 @@ use valence::privacy_policies::common::{AUTHENTICATED, SYSTEM_ONLY};
 
 valence_schema! {
     Tag {
+        repository: "https://github.com/unified-field-dev/tag",
         table: "tag",
         version: "0.1.0",
         database: crate::embedded_surreal::DEFAULT_STORAGE,

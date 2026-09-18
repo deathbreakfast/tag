@@ -2,6 +2,7 @@ use valence::prelude::*;
 
 valence_schema! {
     TagHistory {
+        repository: "https://github.com/unified-field-dev/tag",
         table: "tag_history",
         version: "0.1.3",
         database: crate::embedded_surreal::DEFAULT_STORAGE,

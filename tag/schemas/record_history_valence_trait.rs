@@ -3,6 +3,7 @@ use valence::privacy_policies::common::{BLOCK_ALL, SYSTEM_ONLY};
 
 valence_trait_schema! {
     RecordHistory {
+        repository: "https://github.com/unified-field-dev/tag",
         policies: {
             // Inherit parent Read via the `source` edge (Valence defer_to_edge).
             // Create/delete stay System-only; TagHistory overrides for session append.
