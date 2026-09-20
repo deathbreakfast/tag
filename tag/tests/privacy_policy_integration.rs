@@ -163,10 +163,15 @@ async fn tag_history_update_non_owner_denied_sad() {
             _ => None,
         })
         .expect("history id");
-    let raw = QueryCore::get_record_json("tag_history", &hist_id, &system)
-        .await
-        .expect("get")
-        .expect("row");
+    let raw = QueryCore::get_record_json_used(
+        "tag_history",
+        &hist_id,
+        &system,
+        valence::use_!(r#"**Test:** Fixture row load for `privacy_policy_integration` so the suite can assert Valence privacy policy allow and deny outcomes. CI and developers running the suite only."#),
+    )
+    .await
+    .expect("get")
+    .expect("row");
     let schema = SchemaRegistry::global()
         .get_schema("tag_history")
         .expect("schema");
