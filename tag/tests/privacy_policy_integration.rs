@@ -35,7 +35,7 @@ async fn tag_history_create_defers_to_tag_update_owner_happy() {
         Some(RecordId::new("user", TEST_USER_A)),
     )
     .expect("build");
-    TagHistory::create_used(row, &v, valence::use_!(r"**Test:** Fixture **Tag History** save for `tests` so the suite can arrange and assert persistence behavior. CI and developers running the suite only."))
+    TagHistory::create(row, &v, valence::use_!(r"**Test:** Fixture **Tag History** save for `tests` so the suite can arrange and assert persistence behavior. CI and developers running the suite only."))
         .await
         .expect("owner may create history via defer→Tag Update");
 }
@@ -67,7 +67,7 @@ async fn tag_history_create_non_owner_forge_denied_sad() {
         Some(RecordId::new("user", TEST_USER_A)),
     )
     .expect("build forged row");
-    let forge_attempt = TagHistory::create_used(forged, &outsider_v, valence::use_!(r"**Test:** Fixture **Tag History** save for `tests` so the suite can arrange and assert persistence behavior. CI and developers running the suite only.")).await;
+    let forge_attempt = TagHistory::create(forged, &outsider_v, valence::use_!(r"**Test:** Fixture **Tag History** save for `tests` so the suite can arrange and assert persistence behavior. CI and developers running the suite only.")).await;
     assert!(
         forge_attempt.is_err(),
         "outsider TagHistory::create must fail without Tag Update"
@@ -163,10 +163,15 @@ async fn tag_history_update_non_owner_denied_sad() {
             _ => None,
         })
         .expect("history id");
-    let raw = QueryCore::get_record_json("tag_history", &hist_id, &system)
-        .await
-        .expect("get")
-        .expect("row");
+    let raw = QueryCore::get_record_json(
+        "tag_history",
+        &hist_id,
+        &system,
+        valence::use_!(r"**Test:** Fixture row load for `privacy_policy_integration` so the suite can assert Valence privacy policy allow and deny outcomes. CI and developers running the suite only."),
+    )
+    .await
+    .expect("get")
+    .expect("row");
     let schema = SchemaRegistry::global()
         .get_schema("tag_history")
         .expect("schema");
@@ -217,7 +222,7 @@ async fn tag_history_delete_non_owner_denied_sad() {
         })
         .expect("history id");
 
-    let err = TagHistory::delete_used(&hist_id, &outsider_v, valence::use_!(r"**Test:** Fixture **Tag History** remove for `tests` so the suite can arrange and assert persistence behavior. CI and developers running the suite only.")).await;
+    let err = TagHistory::delete(&hist_id, &outsider_v, valence::use_!(r"**Test:** Fixture **Tag History** remove for `tests` so the suite can arrange and assert persistence behavior. CI and developers running the suite only.")).await;
     assert!(
         err.is_err(),
         "outsider must not delete tag_history without Tag Delete"

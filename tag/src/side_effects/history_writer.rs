@@ -63,7 +63,7 @@ async fn append_row(
         Utc::now(),
         actor,
     )?;
-    if let Err(e) = TagHistory::create_used(row, valence, valence::use_!(r"When **side_effects** needs to persist work, we **save Tag History** so the next step in that feature can continue with the latest values. People and services allowed for **side_effects** use this data for that workflow—not as a general export of unrelated personal fields.")).await {
+    if let Err(e) = TagHistory::create(row, valence, valence::use_!(r"When **side_effects** needs to persist work, we **save Tag History** so the next step in that feature can continue with the latest values. People and services allowed for **side_effects** use this data for that workflow—not as a general export of unrelated personal fields.")).await {
         log::warn!("tag history append failed: source={source} field={field_name}: {e}");
         return Err(e.into());
     }
