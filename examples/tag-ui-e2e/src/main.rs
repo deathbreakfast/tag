@@ -14,7 +14,6 @@ use axum::Router;
 use leptos::config::get_configuration;
 use leptos::prelude::provide_context;
 use leptos_axum::{generate_route_list, LeptosRoutes};
-use std::path::PathBuf;
 use tag_ui_e2e::seed::seed_data;
 use tag_ui_e2e::{
     e2e_higgs_config, e2e_router, init_e2e_valence, inject_e2e_session_snapshot, shell, App,
@@ -40,8 +39,7 @@ async fn serve() -> anyhow::Result<()> {
 
     let site_root = std::path::PathBuf::from(leptos_options.site_root.as_ref());
     let pkg_dir = site_root.join(leptos_options.site_pkg_dir.as_ref());
-    let fonts_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../../L0-upstream-cores/orbital/public/fonts");
+    let fonts_dir = site_root.join("fonts");
 
     let session_store = MemoryStore::default();
     let session_layer = SessionManagerLayer::new(session_store)

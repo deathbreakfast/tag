@@ -59,13 +59,14 @@
 //!
 //! ## Embed tag catalog picker
 //!
-//! [`TagCatalogPicker`] combines Thaw `TagPicker` with the tag catalog search
-//! source so product forms can multi-select shared labels. Embed on any
-//! authenticated page where you store tag ids on a connection or association
-//! field — the list page includes a live demo at `/tag`.
+//! [`TagCatalogPicker`] combines Orbital `TagPicker` with Tag's registered
+//! catalog search source so product forms can multi-select shared labels.
+//! Embed on any authenticated page where you store tag ids on a connection or
+//! association field.
 //!
 //! Bind `selected` to your current id list and wire `on_change` to persist
-//! selections through your product's connection API.
+//! selections through your product's connection API. Pass `seed` with the tags
+//! already attached so their chips show names before the first search returns.
 //!
 //! **Prerequisites:** `ssr` on this crate for
 //! [`search_tag_catalog`](server::search_tag_catalog); `hydrate` when the
@@ -91,11 +92,25 @@
 //! assert!(selected.get().is_empty());
 //! ```
 //!
-//! On success the picker loads catalog rows from
-//! [`search_tag_catalog`](server::search_tag_catalog) and reflects user picks
-//! in `selected`. Optional `taxonomy_filter` narrows results;
-//! `manage_tags_href` defaults to `/tag` for admins who need the full catalog
-//! UI. See [`TagCatalogPicker`] rustdoc for prop contracts.
+//! On success the picker searches the catalog through
+//! [`search_tag_catalog`](server::search_tag_catalog) as the user types and
+//! reflects picks in `selected`. `manage_tags_href` defaults to `/tag` for
+//! admins who need the full catalog UI. See [`TagCatalogPicker`] rustdoc for
+//! prop contracts.
+//!
+//! ### Create a tag from the picker
+//!
+//! When no tag has the typed name, the list offers `<text> (new)`. Choosing it
+//! opens [`TagCreateDialog`] with Name prefilled; Create adds the tag to the
+//! catalog and selects it. The parent form still decides when to save the
+//! selection. If someone else claimed the name first, the dialog offers "Use
+//! existing tag" instead.
+//!
+//! Filters should turn this off, since a brand-new tag matches nothing:
+//!
+//! ```rust,ignore
+//! view! { <TagCatalogPicker selected=filter_tags on_change=on_filter allow_create=false /> }
+//! ```
 //!
 //! ## Feature flags
 //!
@@ -125,6 +140,7 @@
 //! - [`server`] — Higgs wrappers; [`TagServerError`] / [`into_server_error`].
 //! - [`pages`] — list / create / detail UI.
 //! - [`TagCatalogPicker`] — embed API for other products.
+//! - [`TagCreateDialog`] — the create dialog the picker opens; reusable on its own.
 //! - [`layout`] — `TagAppLayout` (platform shell via `uf-integrations`).
 //! - Sibling crate `tag` — schemas, catalog service, history writers.
 //! - Root `SECURITY.md` — session-required server fns.
@@ -145,8 +161,10 @@ pub mod layout;
 mod lazy_routes;
 pub mod pages;
 pub mod server;
+#[cfg(all(test, feature = "ssr"))]
+mod test_support;
 
-pub use components::TagCatalogPicker;
+pub use components::{TagCatalogPicker, TagCreateDialog};
 #[cfg(feature = "preview")]
 pub use components::{TAGCATALOGPICKER_DOC, TAGCATALOGPICKER_PROPS};
 

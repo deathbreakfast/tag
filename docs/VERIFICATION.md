@@ -3,7 +3,8 @@
 Re-run after code or doc changes. This workspace is the Tag product
 (`tag` catalog service + `tag-app` Leptos UI / `TagRoutes`). Layer 1 covers
 the product-local catalog CRUD that backs `tag-app` server functions
-(`create_tag`, `list_tags`, `get_tag`, `update_tag`, `delete_tag`), plus
+(`create_tag`, `list_tags`, `get_tag`, `find_tag_by_name`, `update_tag`,
+`delete_tag`), plus
 sibling-source UI surface **contracts** for `tag-app` (source needles — not
 runtime validation). Layer 2 is Playwright against the `tag-ui-e2e` lab host.
 Valence / record-history own persistence primitives; this repo verifies the
@@ -60,7 +61,8 @@ cargo test -p tag --test workspace_members --test product_surface
 cargo test -p tag --features ssr \
   --test tag_crud_contract \
   --test tag_service_integration \
-  --test privacy_policy_integration
+  --test privacy_policy_integration \
+  --test tag_unique_name
 cargo check -p protected-tag-host
 cargo run -p protected-tag-host
 RUSTDOCFLAGS="-D rustdoc::broken-intra-doc-links" cargo doc -p tag --features ssr --no-deps
@@ -82,6 +84,12 @@ UI compile issue, not a tag catalog contract gap:
 ```bash
 cargo clippy --workspace --all-targets --features ssr -- -D warnings
 cargo test --workspace --features ssr
+```
+
+`tag-app` unit tests (server fns against in-memory SQLite, picker helpers):
+
+```bash
+cargo test -p tag-app --features ssr --lib
 ```
 
 `tag-app` (Leptos UI + Higgs `#[server]` wrappers) may fail to compile when the

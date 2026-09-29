@@ -76,6 +76,10 @@ name = "tag_crud_contract"
 required-features = ["ssr"]
 
 [[test]]
+name = "tag_unique_name"
+required-features = ["ssr"]
+
+[[test]]
 name = "privacy_policy_integration"
 required-features = ["ssr"]
 

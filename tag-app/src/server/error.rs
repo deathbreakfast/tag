@@ -7,12 +7,23 @@
 use leptos::prelude::ServerFnError;
 use thiserror::Error;
 
+/// Stable code carried by the [`TagServerError::DuplicateName`] message.
+pub const DUPLICATE_NAME_CODE: &str = "tag.duplicate_name";
+
+/// Whether a server fn failed because the tag name is already taken.
+#[must_use]
+pub fn is_duplicate_name(err: &ServerFnError) -> bool {
+    err.to_string().contains(DUPLICATE_NAME_CODE)
+}
+
 /// Tag-app server function errors (auth, domain, search sources, infrastructure).
 ///
 /// Classification:
 /// - [`NotAuthenticated`](Self::NotAuthenticated) / [`AccessDenied`](Self::AccessDenied) /
-///   [`NotFound`](Self::NotFound) / [`InvalidSource`](Self::InvalidSource) — permanent for this request
-/// - [`Service`](Self::Service) / [`Valence`](Self::Valence) — infrastructure / unexpected
+///   [`NotFound`](Self::NotFound) / [`DuplicateName`](Self::DuplicateName) /
+///   [`InvalidSource`](Self::InvalidSource) — permanent for this request
+/// - [`Service`](Self::Service) / [`SearchSource`](Self::SearchSource) /
+///   [`Valence`](Self::Valence) — infrastructure / unexpected
 #[derive(Error, Debug)]
 pub enum TagServerError {
     /// The caller has no authenticated session but one is required.
@@ -33,9 +44,22 @@ pub enum TagServerError {
         policy: &'static str,
     },
 
+    /// Another tag already uses this name (ignoring case and surrounding
+    /// whitespace). The message starts with [`DUPLICATE_NAME_CODE`] so clients
+    /// can detect it with [`is_duplicate_name`].
+    #[error("{DUPLICATE_NAME_CODE}: a tag named {name_key} already exists")]
+    DuplicateName {
+        /// The requested name after `tag::normalize_name_key`.
+        name_key: String,
+    },
+
     /// Picker requested a search source this server fn does not serve.
     #[error("unsupported search source: {0}")]
     InvalidSource(String),
+
+    /// A registered search source failed while answering a catalog search.
+    #[error("tag catalog search failed: {0}")]
+    SearchSource(String),
 
     /// Underlying Valence, history, or ownership service failure from `tag`.
     #[error("tag catalog {operation} failed: {message}")]
@@ -56,6 +80,7 @@ impl From<tag::TagError> for TagServerError {
     fn from(value: tag::TagError) -> Self {
         match value {
             tag::TagError::NotFound { id } => Self::NotFound { id },
+            tag::TagError::DuplicateName { name_key } => Self::DuplicateName { name_key },
             tag::TagError::AccessDenied { policy } => Self::AccessDenied { policy },
             tag::TagError::Service { operation, source } => Self::Service {
                 operation,
@@ -77,20 +102,31 @@ pub fn into_server_error(operation: &'static str, e: TagServerError) -> ServerFn
     let error_kind = match &e {
         TagServerError::NotAuthenticated => "not_authenticated",
         TagServerError::NotFound { .. } => "not_found",
+        TagServerError::DuplicateName { .. } => "duplicate_name",
         TagServerError::AccessDenied { .. } => "access_denied",
         TagServerError::InvalidSource(_) => "invalid_source",
+        TagServerError::SearchSource(_) => "search_source",
         TagServerError::Service { .. } => "service",
         TagServerError::Valence(_) => "valence",
     };
 
     #[cfg(feature = "ssr")]
     {
-        tracing::warn!(
-            operation,
-            error_kind,
-            error = %e,
-            "tag server fn failed"
-        );
+        if matches!(e, TagServerError::DuplicateName { .. }) {
+            // Expected user outcome; the message echoes the typed name.
+            tracing::debug!(
+                operation,
+                error_kind,
+                "tag server fn rejected duplicate name"
+            );
+        } else {
+            tracing::warn!(
+                operation,
+                error_kind,
+                error = %e,
+                "tag server fn failed"
+            );
+        }
     }
     #[cfg(not(feature = "ssr"))]
     {
@@ -102,7 +138,33 @@ pub fn into_server_error(operation: &'static str, e: TagServerError) -> ServerFn
 
 #[cfg(test)]
 mod tests {
-    use super::{into_server_error, TagServerError};
+    use super::{into_server_error, is_duplicate_name, TagServerError};
+
+    #[test]
+    fn create_tag_duplicate_carries_stable_code_sad() {
+        let err = into_server_error(
+            "create_tag",
+            TagServerError::DuplicateName {
+                name_key: "ops".into(),
+            },
+        );
+        assert!(is_duplicate_name(&err));
+        assert!(err.to_string().contains("a tag named ops already exists"));
+        let other = into_server_error("create_tag", TagServerError::NotAuthenticated);
+        assert!(!is_duplicate_name(&other));
+    }
+
+    #[cfg(feature = "ssr")]
+    #[test]
+    fn duplicate_name_error_maps_in_tag_app_sad() {
+        let mapped: TagServerError = tag::TagError::DuplicateName {
+            name_key: "ops".into(),
+        }
+        .into();
+        assert!(
+            matches!(mapped, TagServerError::DuplicateName { ref name_key } if name_key == "ops")
+        );
+    }
 
     #[test]
     fn maps_not_found_display() {

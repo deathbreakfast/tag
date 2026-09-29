@@ -3,9 +3,11 @@
 //! # Errors
 //!
 //! Fallible entry points return [`TagError`]: [`TagError::NotFound`] on update
-//! of a missing id, [`TagError::AccessDenied`] when ownership blocks delete,
-//! and [`TagError::Service`] for Valence / history failures. `get` uses
-//! `Ok(None)` for absence. `tag-app` maps these into `ServerFnError`.
+//! of a missing id, [`TagError::DuplicateName`] when create or update would
+//! reuse another tag's name, [`TagError::AccessDenied`] when ownership blocks
+//! delete, and [`TagError::Service`] for Valence / history failures. `get` and
+//! `get_by_name` use `Ok(None)` for absence. `tag-app` maps these into
+//! `ServerFnError`.
 
 mod helpers;
 
@@ -15,7 +17,7 @@ use valence::{Model, Mutation, MutationKind, StringPredicate, Valence};
 
 use crate::generated::Tag;
 use crate::side_effects::TagHistoryWriter;
-use crate::types::{TagCreateInput, TagDetailDto, TagRowDto, TagUpdateInput};
+use crate::types::{normalize_name_key, TagCreateInput, TagDetailDto, TagRowDto, TagUpdateInput};
 
 use super::TagError;
 use helpers::{
@@ -23,14 +25,26 @@ use helpers::{
 };
 
 /// Create a new tag and write its `created` history row.
+///
+/// Returns [`TagError::DuplicateName`] when another tag has the same
+/// [`normalize_name_key`], including when a concurrent create claims the name
+/// first.
 pub async fn create(input: TagCreateInput, v: &Valence) -> Result<TagDetailDto, TagError> {
     let now = Utc::now();
     let id = Uuid::new_v4().to_string();
-    let tag = Tag::new(input.name, input.taxonomy, input.description, now, now)
-        .map_err(|e| TagError::service("create", e))?;
+    let name_key = normalize_name_key(&input.name);
+    let tag = Tag::new(
+        input.name,
+        name_key.clone(),
+        input.taxonomy,
+        input.description,
+        now,
+        now,
+    )
+    .map_err(|e| TagError::service("create", e))?;
     let created = Tag::upsert(&id, tag, v, valence::use_!(r"When **service** needs to persist work, we **save Tag** so the next step in that feature can continue with the latest values. People and services allowed for **service** use this data for that workflow—not as a general export of unrelated personal fields."))
         .await
-        .map_err(|e| TagError::service("create", e))?;
+        .map_err(|e| TagError::from_write("create", &name_key, e))?;
     let field_changes = crate::generated::TagFieldChanges::compute(None, Some(&created));
     let mutation = Mutation::new(
         MutationKind::Create,
@@ -49,6 +63,9 @@ pub async fn create(input: TagCreateInput, v: &Valence) -> Result<TagDetailDto, 
 
 /// Apply a partial update to an existing tag and write per-field history rows
 /// for whichever fields actually changed.
+///
+/// Renaming onto another tag's name returns [`TagError::DuplicateName`];
+/// changing only the case of the tag's own name is allowed.
 pub async fn update(
     id: &str,
     input: TagUpdateInput,
@@ -59,9 +76,13 @@ pub async fn update(
         .map_err(|e| TagError::service("update", e))?
         .ok_or_else(|| TagError::not_found(id))?;
     let mut builder = before.get_mutable(v, valence::use_!(r"In **service**, we **update Tag Mutable** in place so saved changes apply on the next read. The same actors who can run **service** use the updated values; this step is not a silent copy to an external marketing system."));
+    let mut name_key = before.name_key().clone();
     if let Some(name) = input.name {
+        name_key = normalize_name_key(&name);
         builder = builder
             .set_name(name)
+            .map_err(|e| TagError::service("update", e))?
+            .set_name_key(name_key.clone())
             .map_err(|e| TagError::service("update", e))?;
     }
     if let Some(taxonomy) = input.taxonomy {
@@ -80,7 +101,7 @@ pub async fn update(
     let updated = builder
         .commit()
         .await
-        .map_err(|e| TagError::service("update", e))?;
+        .map_err(|e| TagError::from_write("update", &name_key, e))?;
     let field_changes = crate::generated::TagFieldChanges::compute(Some(&before), Some(&updated));
     let mutation = Mutation::new(
         MutationKind::Update,
@@ -141,8 +162,28 @@ pub async fn get(id: &str, v: &Valence) -> Result<Option<TagDetailDto>, TagError
     Ok(Some(to_detail_dto_with_id(&tag, id, owner)))
 }
 
-/// List tags, optionally filtered by a name-contains `search` term and/or exact
-/// `taxonomy`, ordered by most-recently updated first.
+/// Load the tag whose name matches `name` ignoring case and surrounding
+/// whitespace. Returns `Ok(None)` when no tag matches or `name` is blank.
+pub async fn get_by_name(name: &str, v: &Valence) -> Result<Option<TagDetailDto>, TagError> {
+    let name_key = normalize_name_key(name);
+    if name_key.is_empty() {
+        return Ok(None);
+    }
+    let Some(tag) = Tag::query(v, valence::use_!(r"In **service**, we **load Tag** by its normalized name so callers can resolve a label someone typed to the catalog row. The result is used by **service** logic—not necessarily displayed on a page unless that feature’s UI shows it."))
+        .where_name_key(StringPredicate::Equals(name_key))
+        .first()
+        .await
+        .map_err(|e| TagError::service("get_by_name", e))?
+    else {
+        return Ok(None);
+    };
+    let id = record_id_str(&tag);
+    let owner = owner_display(&id, v).await;
+    Ok(Some(to_detail_dto_with_id(&tag, &id, owner)))
+}
+
+/// List tags, optionally filtered by a name-contains `search` term (ignoring
+/// case) and/or exact `taxonomy`, ordered by most-recently updated first.
 pub async fn list(
     v: &Valence,
     search: Option<String>,
@@ -154,8 +195,9 @@ pub async fn list(
             r"In **service**, we **list Tag** so the product can show or process the matching set for this workflow. Callers allowed for **service** use the list; it is not a public dump of every field to anonymous visitors."
         ),
     );
-    if let Some(term) = search.filter(|s| !s.trim().is_empty()) {
-        q = q.where_name(StringPredicate::Contains(term));
+    let search = search.map(|s| normalize_name_key(&s));
+    if let Some(term) = search.filter(|s| !s.is_empty()) {
+        q = q.where_name_key(StringPredicate::Contains(term));
     }
     if let Some(tax) = taxonomy.filter(|s| !s.trim().is_empty()) {
         q = q.where_taxonomy(StringPredicate::Equals(tax));

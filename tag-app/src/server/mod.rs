@@ -6,13 +6,17 @@ mod tag_catalog_search;
 use leptos::prelude::*;
 use tag::types::{TagCreateInput, TagDetailDto, TagRowDto, TagUpdateInput};
 
-pub use error::{into_server_error, TagServerError};
+pub use error::{into_server_error, is_duplicate_name, TagServerError, DUPLICATE_NAME_CODE};
 pub use tag_catalog_search::search_tag_catalog;
 
 #[cfg(feature = "ssr")]
-#[allow(clippy::missing_const_for_fn)] // Higgs session lookup is not const
 fn require_session(ctx: &higgs::Higgs) -> Result<(), TagServerError> {
-    if ctx.session_user_id().is_some() {
+    require_user(ctx.session_user_id().map(String::as_str))
+}
+
+#[cfg(feature = "ssr")]
+const fn require_user(session_user_id: Option<&str>) -> Result<(), TagServerError> {
+    if session_user_id.is_some() {
         Ok(())
     } else {
         Err(TagServerError::NotAuthenticated)
@@ -60,7 +64,64 @@ pub async fn get_tag(
     .map_err(|e| into_server_error("get_tag", TagServerError::from(e)))
 }
 
+#[cfg(all(test, feature = "ssr"))]
+mod tests {
+    use super::require_user;
+    use tag::types::TagCreateInput;
+
+    #[tokio::test]
+    async fn find_tag_by_name_normalizes_happy() {
+        let v = crate::test_support::valence_as_user().await;
+        let ops = tag::create(
+            TagCreateInput {
+                name: "Ops".into(),
+                taxonomy: None,
+                description: None,
+            },
+            &v,
+        )
+        .await
+        .expect("create");
+        let found = tag::get_by_name("  OPS ", &v).await.expect("lookup");
+        assert_eq!(found.map(|t| t.id), Some(ops.id));
+    }
+
+    #[tokio::test]
+    async fn find_tag_by_name_missing_none_sad() {
+        let v = crate::test_support::valence_as_user().await;
+        assert!(tag::get_by_name("nope", &v)
+            .await
+            .expect("lookup")
+            .is_none());
+    }
+
+    #[test]
+    fn find_tag_by_name_unauthenticated_sad() {
+        assert!(require_user(None).is_err());
+    }
+}
+
+/// Load the tag whose name matches `name` ignoring case and surrounding
+/// whitespace, or `None` when nothing matches.
+#[uf_product_macros::server]
+pub async fn find_tag_by_name(
+    /// Tag name as the user typed it.
+    name: String,
+) -> Result<Option<TagDetailDto>, ServerFnError> {
+    let ctx = higgs::Higgs::from_request().await?;
+    require_session(&ctx).map_err(|e| into_server_error("find_tag_by_name", e))?;
+    tag::get_by_name(
+        &name,
+        &valence_from_ctx(&ctx).map_err(|e| into_server_error("find_tag_by_name", e))?,
+    )
+    .await
+    .map_err(|e| into_server_error("find_tag_by_name", TagServerError::from(e)))
+}
+
 /// Create a new tag from the given input.
+///
+/// Fails with a [`DUPLICATE_NAME_CODE`] error (see [`is_duplicate_name`]) when
+/// the name is already taken.
 #[uf_product_macros::server]
 pub async fn create_tag(
     /// Fields describing the new tag.

@@ -65,6 +65,7 @@ jobs:
           --test tag_crud_contract
           --test tag_service_integration
           --test privacy_policy_integration
+          --test tag_unique_name
       - name: cargo check + run (protected-tag-host)
         run: |
           cargo check -p protected-tag-host

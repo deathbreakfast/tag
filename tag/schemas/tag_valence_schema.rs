@@ -7,7 +7,7 @@ valence_schema! {
     Tag {
         repository: "https://github.com/unified-field-dev/tag",
         table: "tag",
-        version: "0.1.0",
+        version: "0.2.0",
         database: crate::embedded_surreal::DEFAULT_STORAGE,
         description: "Shared tag catalog row (name, taxonomy, description)",
 
@@ -38,6 +38,13 @@ valence_schema! {
             name: {
                 r#type: FieldType::String,
                 required: true,
+            },
+            // `normalize_name_key(name)`; the unique index makes names unique
+            // ignoring case and surrounding whitespace.
+            name_key: {
+                r#type: FieldType::String,
+                required: true,
+                unique: true,
             },
             taxonomy: {
                 r#type: FieldType::String,

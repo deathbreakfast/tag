@@ -14,6 +14,10 @@
 //! - **Per-field change history** — [`side_effects::TagHistoryWriter`] appends
 //!   one `tag_history` row per changed field so detail pages can embed a
 //!   platform timeline.
+//! - **Unique names** — Names are unique ignoring case and surrounding
+//!   spaces. The `name_key` column carries a unique index, so a duplicate
+//!   create or rename fails with [`TagError::DuplicateName`] even when two
+//!   requests race. [`get_by_name`] looks a tag up the same way.
 //! - **Ownership-gated delete** — Only the tag owner or System may delete a
 //!   row; see [`privacy_policies`].
 //! - **Catalog search source** — [`search_sources::TagCatalogSearchSource`]
@@ -31,7 +35,7 @@
 //!
 //! ```rust,ignore
 //! use tag::types::{TagCreateInput, TagUpdateInput};
-//! use tag::{create, delete, get, list, update};
+//! use tag::{create, delete, get, get_by_name, list, update, TagError};
 //!
 //! let created = create(
 //!     TagCreateInput {
@@ -41,6 +45,19 @@
 //!     },
 //!     &valence,
 //! ).await?;
+//!
+//! // Names are unique ignoring case and surrounding spaces.
+//! let dup = create(
+//!     TagCreateInput {
+//!         name: " office supplies ".into(),
+//!         taxonomy: None,
+//!         description: None,
+//!     },
+//!     &valence,
+//! ).await;
+//! assert!(matches!(dup, Err(TagError::DuplicateName { .. })));
+//! let found = get_by_name("OFFICE SUPPLIES", &valence).await?;
+//! assert_eq!(found.map(|t| t.id), Some(created.id.clone()));
 //!
 //! let updated = update(
 //!     &created.id,
@@ -65,7 +82,8 @@
 //! On success `get` returns the mutated DTO, `list` includes matching taxonomy
 //! filters, and `delete` removes the row after writing a final history entry.
 //! [`TagError::NotFound`] surfaces on update of a missing id;
-//! [`TagError::AccessDenied`] when a non-owner calls `delete`; Valence and
+//! [`TagError::DuplicateName`] when `create` or `update` would reuse another
+//! tag's name; [`TagError::AccessDenied`] when a non-owner calls `delete`; Valence and
 //! history failures map to [`TagError::Service`]. `tag-app` server fns map
 //! these into `ServerFnError`. Direct model privacy denials remain
 //! `valence::Error` strings (for example pending deletion).
@@ -88,8 +106,10 @@
 //! Catalog create/update/list/delete with history:
 //! [Tag catalog CRUD](#tag-catalog-crud).
 //!
-//! Run `cargo test -p tag --test tag_crud_contract` and
-//! `cargo test -p tag --test tag_service_integration`.
+//! Run `cargo test -p tag --test tag_crud_contract`,
+//! `cargo test -p tag --test tag_service_integration`, and
+//! `cargo test -p tag --features ssr --test tag_unique_name` (duplicate names,
+//! including concurrent creates).
 //!
 //! Workspace example `protected-tag-host` covers auth, catalog CRUD, and
 //! `ManyToMany` composition (inventory `tag` / `/tag`):
@@ -121,3 +141,4 @@ pub mod tag;
 pub use tag::*;
 
 pub use search_sources::TagSearchSourceId;
+pub use types::normalize_name_key;

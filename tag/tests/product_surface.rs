@@ -227,10 +227,15 @@ fn pages_testid_and_bindings_happy_path() {
         assert!(list.contains(needle), "TagListPage missing `{needle}`");
     }
 
-    let create = read_app("pages/create.rs");
+    let create = format!(
+        "{}\n{}",
+        read_app("pages/create.rs"),
+        read_app("components/tag_create_dialog.rs")
+    );
     for needle in [
         "tag-create-page",
         "create_tag",
+        "TagCreateFields",
         "tag-create-name",
         "tag-create-submit",
     ] {
@@ -292,11 +297,12 @@ fn catalog_picker_search_binding_happy_path() {
     let picker = read_app("components/tag_catalog_picker.rs");
     for needle in [
         "tag-catalog-picker",
-        "tag-catalog-picker-search",
         "search_tag_catalog",
         "TagSearchSourceId::Catalog",
         "tag-catalog-picker-manage",
-        "fetch_catalog",
+        "on_search",
+        "tag-catalog-picker-create-option",
+        "TagCreateDialog",
     ] {
         assert!(
             picker.contains(needle),
@@ -304,8 +310,8 @@ fn catalog_picker_search_binding_happy_path() {
         );
     }
     assert!(
-        picker.contains("query.get()") || picker.contains("Some(q)"),
-        "picker must pass catalog search query into fetch_catalog"
+        !picker.contains("tag-catalog-picker-search"),
+        "picker searches from the chip input, not a second search box"
     );
 }
 
@@ -315,8 +321,8 @@ fn search_tag_catalog_clamps_limit_happy_path() {
     assert!(
         search.contains("SEARCH_TAG_CATALOG_MAX")
             && search.contains("clamp(1, SEARCH_TAG_CATALOG_MAX)")
-            && search.contains(".take(take)"),
-        "search_tag_catalog must clamp limit and apply take"
+            && search.contains("query_many"),
+        "search_tag_catalog must clamp limit and query through the registry"
     );
     assert!(
         search.contains("InvalidSource") || search.contains("unsupported search source"),

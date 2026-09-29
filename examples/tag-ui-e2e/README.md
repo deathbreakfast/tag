@@ -6,10 +6,11 @@ sign-in). No Mailpit / OIDC / SMS.
 
 ## Run
 
+From the repository root:
+
 ```bash
 export CARGO_BUILD_JOBS=1
 export CARGO_TARGET_DIR=target-tag
-cd /home/seanorourke/unified-field/L3-zone-products/tag
 cd examples/tag-ui-e2e/end2end && npm ci && npx playwright install chromium && cd ../../..
 cargo leptos end-to-end --project tag-ui-e2e
 ```

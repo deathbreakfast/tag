@@ -4,13 +4,12 @@ use leptos::prelude::*;
 use leptos::task::spawn_local_scoped;
 use leptos_router::hooks::use_navigate;
 use leptos_router::NavigateOptions;
-use tag::types::TagCreateInput;
 use uf_product::components::{
-    Button, ButtonAppearance, Caption1, Card, ContentContainer, Field, Flex, FlexGap, FlexJustify,
-    Input, InputAppearance, MessageBar, MessageBarIntent, SpacingSize, Textarea,
-    TextareaAppearance, Title3,
+    Button, ButtonAppearance, Caption1, Card, ContentContainer, Flex, FlexGap, FlexJustify,
+    MessageBar, MessageBarIntent, SpacingSize, Title3,
 };
 
+use crate::components::{tag_create_input, TagCreateFields};
 use crate::server::create_tag;
 
 /// Form page for creating a new tag; navigates to the detail page on success.
@@ -25,25 +24,7 @@ pub fn TagCreatePage() -> impl IntoView {
 
     let on_submit = move |_| {
         let navigate = navigate.clone();
-        let payload = TagCreateInput {
-            name: name.get(),
-            taxonomy: {
-                let t = taxonomy.get();
-                if t.trim().is_empty() {
-                    None
-                } else {
-                    Some(t)
-                }
-            },
-            description: {
-                let d = description.get();
-                if d.trim().is_empty() {
-                    None
-                } else {
-                    Some(d)
-                }
-            },
-        };
+        let payload = tag_create_input(name.get(), taxonomy.get(), description.get());
         error.set(None);
         submitting.set(true);
         spawn_local_scoped(async move {
@@ -72,30 +53,7 @@ pub fn TagCreatePage() -> impl IntoView {
 
                 <Card>
                     <Flex vertical=true gap=FlexGap::Medium padding=SpacingSize::Size200.inset()>
-                        <Field label="Name" required=true>
-                            <div attr:data-testid="tag-create-name">
-                                <Input
-                                    bind=name
-                                    appearance=InputAppearance::with_placeholder("Office Supplies")
-                                />
-                            </div>
-                        </Field>
-                        <Field label="Taxonomy">
-                            <div attr:data-testid="tag-create-taxonomy">
-                                <Input
-                                    bind=taxonomy
-                                    appearance=InputAppearance::with_placeholder("spend")
-                                />
-                            </div>
-                        </Field>
-                        <Field label="Description">
-                            <div attr:data-testid="tag-create-description">
-                                <Textarea
-                                    bind=description
-                                    appearance=TextareaAppearance::with_placeholder("Optional description")
-                                />
-                            </div>
-                        </Field>
+                        <TagCreateFields name taxonomy description />
 
                         {move || error.get().map(|msg| view! {
                             <MessageBar intent=MessageBarIntent::Error>{msg}</MessageBar>

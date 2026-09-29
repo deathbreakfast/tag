@@ -17,7 +17,11 @@ live in the `tag` crate; this package wraps them for operators and exposes
 
 ## Tests
 
-In-crate unit coverage is intentionally thin (error-mapping tests under
-`server`). Behavioral contracts live in the sibling `tag` crate
-(`product_surface`, `tag_crud_contract`, `tag_service_integration`) and
-Playwright in `examples/tag-ui-e2e`.
+`cargo test -p tag-app --features ssr --lib` covers error mapping, the
+`search_tag_catalog` and `find_tag_by_name` server fns against in-memory
+SQLite, and the picker's pure helpers (create offer, label cache, request
+ordering). Behavioral contracts live in the sibling `tag` crate
+(`product_surface`, `tag_crud_contract`, `tag_service_integration`,
+`tag_unique_name`) and Playwright in `examples/tag-ui-e2e`. Picker and
+create-dialog flows are exercised end to end by the Catalyst and Finance lab
+hosts.

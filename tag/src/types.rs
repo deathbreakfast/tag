@@ -7,6 +7,15 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
+/// The key tag names are unique on: `name` trimmed and lowercased.
+///
+/// `" Ops "`, `"ops"` and `"OPS"` all normalize to `"ops"`, so only one of
+/// them can exist in the catalog.
+#[must_use]
+pub fn normalize_name_key(name: &str) -> String {
+    name.trim().to_lowercase()
+}
+
 /// Input for creating a new tag.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TagCreateInput {

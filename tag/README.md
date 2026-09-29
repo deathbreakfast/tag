@@ -2,7 +2,9 @@
 
 Shared label catalog with Valence connections (no assignment table).
 
-Tag stores catalog rows (`name`, `taxonomy`, `owner`, timestamps). Product
+Tag stores catalog rows (`name`, `taxonomy`, `owner`, timestamps). Names are
+unique ignoring case and surrounding spaces, enforced by a unique index on
+`name_key`. Product
 records link tags through **Valence `connections` (ManyToMany)**. Definition
 edits append `tag_history` rows; detail pages embed
 `<HistoryTimeline source_id />` from
