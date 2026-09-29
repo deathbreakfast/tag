@@ -18,6 +18,7 @@
 //!   spaces. The `name_key` column carries a unique index, so a duplicate
 //!   create or rename fails with [`TagError::DuplicateName`] even when two
 //!   requests race. [`get_by_name`] looks a tag up the same way.
+//!   [Get started](#tag-catalog-crud)
 //! - **Ownership-gated delete** — Only the tag owner or System may delete a
 //!   row; see [`privacy_policies`].
 //! - **Catalog search source** — [`search_sources::TagCatalogSearchSource`]
@@ -29,6 +30,9 @@
 //! appends history through [`side_effects::TagHistoryWriter`] so audit
 //! timelines stay complete without separate history calls. Use it from
 //! `tag-app` server fns or custom SSR handlers once session Valence is wired.
+//! Names are unique ignoring case and surrounding spaces, so check with
+//! [`get_by_name`] before offering a new tag and treat
+//! [`TagError::DuplicateName`] as "use the existing one".
 //!
 //! **Prerequisites:** `ssr` feature; a `Valence` handle whose router includes
 //! the tag schemas (compiled in with this crate under `ssr`).
