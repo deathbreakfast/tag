@@ -185,6 +185,7 @@ uf_app! {
     version: "0.1.0",
     routes: TagRoutes,
     route_path: "/tag",
+    repository: "https://github.com/unified-field-dev/tag",
 }
 
 /// Route tree for the Tags app: list, create, and detail/edit pages, nested under
