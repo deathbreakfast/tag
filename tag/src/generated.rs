@@ -12,7 +12,7 @@
 //! source-of-truth field definitions.
 
 #[cfg(feature = "ssr")]
-use crate::privacy_policies::TAG_DATA_OWNER;
+use crate::privacy_policies::{TAG_DATA_OWNER, TAG_READ_ACTIVE_BOT};
 #[cfg(feature = "ssr")]
 use crate::side_effects::history_writer::TagHistoryWriter;
 #[cfg(feature = "ssr")]
