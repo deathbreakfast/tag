@@ -288,17 +288,19 @@ async fn tag_history_schema_has_source_edge_for_defer() {
     );
 }
 
-// Bot accounts act as `Actor::ServiceUser { service_name: "bot:<id>" }`. The
-// `bot` table belongs to lepton and is not registered in this test graph, so
-// the fixture writes its rows raw, the way `TAG_READ_ACTIVE_BOT` reads them.
+// Service users act as `Actor::ServiceUser { service_name: "svc:<id>" }`. The
+// `service_user_account` table belongs to lepton and is not registered in this test graph, so
+// the fixture writes its rows raw, the way `TAG_READ_ACTIVE_SERVICE_USER` reads them.
 
-const ACTIVE_BOT: &str = "3f2b8c1e-5d4a-4e7b-9c10-0a1b2c3d4e5f";
-const SUSPENDED_BOT: &str = "7a9d2e4b-1c3f-4a6e-8b5d-2e4f6a8c0b1d";
-const ORG_BOT: &str = "c4e6a8b0-2d4f-4a1c-9e3b-5d7f9a1b3c5e";
-const MISSING_BOT: &str = "00000000-0000-4000-8000-000000000000";
+const ACTIVE_SERVICE_USER: &str = "3f2b8c1e-5d4a-4e7b-9c10-0a1b2c3d4e5f";
+const SUSPENDED_SERVICE_USER: &str = "7a9d2e4b-1c3f-4a6e-8b5d-2e4f6a8c0b1d";
+const ORG_SERVICE_USER: &str = "c4e6a8b0-2d4f-4a1c-9e3b-5d7f9a1b3c5e";
+const MISSING_SERVICE_USER: &str = "00000000-0000-4000-8000-000000000000";
 
-async fn seed_bot(system: &valence::Valence, id: &str, owner_kind: &str, status: &str) {
-    let backend = system.backend_for_table("bot").expect("bot backend");
+async fn seed_service_user(system: &valence::Valence, id: &str, owner_kind: &str, status: &str) {
+    let backend = system
+        .backend_for_table("service_user_account")
+        .expect("service user backend");
     let row = serde_json::json!({
         "id": id,
         "user": serde_json::to_value(RecordId::new("user", TEST_USER_A)).expect("owner record"),
@@ -306,9 +308,9 @@ async fn seed_bot(system: &valence::Valence, id: &str, owner_kind: &str, status:
         "status": status,
     });
     backend
-        .upsert_record("bot", id, row)
+        .upsert_record("service_user_account", id, row)
         .await
-        .expect("seed bot");
+        .expect("seed service user");
 }
 
 fn as_service(base: &valence::Valence, service_name: &str) -> valence::Valence {
@@ -317,12 +319,12 @@ fn as_service(base: &valence::Valence, service_name: &str) -> valence::Valence {
     })
 }
 
-/// Shared DB with the bot fixtures and one tag created by `TEST_USER_A`.
-async fn bot_fixture(name: &str) -> (valence::Valence, String) {
+/// Shared DB with the service user fixtures and one tag created by `TEST_USER_A`.
+async fn service_user_fixture(name: &str) -> (valence::Valence, String) {
     let base = setup_shared_db().await;
-    seed_bot(&base, ACTIVE_BOT, "user", "active").await;
-    seed_bot(&base, SUSPENDED_BOT, "user", "suspended").await;
-    seed_bot(&base, ORG_BOT, "org", "active").await;
+    seed_service_user(&base, ACTIVE_SERVICE_USER, "user", "active").await;
+    seed_service_user(&base, SUSPENDED_SERVICE_USER, "user", "suspended").await;
+    seed_service_user(&base, ORG_SERVICE_USER, "org", "active").await;
     let created = create(
         TagCreateInput {
             name: name.into(),
@@ -361,88 +363,102 @@ fn is_privacy_denial<T>(result: &Result<T, tag::TagError>) -> bool {
 }
 
 #[tokio::test]
-async fn active_bot_reads_and_lists_shared_tag_happy_path() {
-    let (base, tag_id) = bot_fixture("Bot Visible").await;
-    let bot = as_service(&base, &format!("bot:{ACTIVE_BOT}"));
+async fn active_service_user_reads_and_lists_shared_tag_happy_path() {
+    let (base, tag_id) = service_user_fixture("Service user Visible").await;
+    let service_user = as_service(&base, &format!("svc:{ACTIVE_SERVICE_USER}"));
 
-    let seen = tag::get(&tag_id, &bot)
+    let seen = tag::get(&tag_id, &service_user)
         .await
-        .expect("bot get")
-        .expect("active bot must read the shared catalog tag");
-    assert_eq!(seen.name, "Bot Visible");
+        .expect("service user get")
+        .expect("active service user must read the shared catalog tag");
+    assert_eq!(seen.name, "Service user Visible");
 
-    let listed = tag::list(&bot, None, None).await.expect("bot list");
+    let listed = tag::list(&service_user, None, None)
+        .await
+        .expect("service user list");
     assert!(
         listed
             .iter()
-            .any(|r| r.id == tag_id && r.name == "Bot Visible"),
-        "active bot list must include the owner-created tag"
+            .any(|r| r.id == tag_id && r.name == "Service user Visible"),
+        "active service user list must include the owner-created tag"
     );
 }
 
 #[tokio::test]
-async fn suspended_org_owned_or_missing_bot_cannot_read_tag_sad() {
-    let (base, tag_id) = bot_fixture("Bot Hidden").await;
-    for (bot_id, who) in [
-        (SUSPENDED_BOT, "suspended bot"),
-        (ORG_BOT, "org-owned bot"),
-        (MISSING_BOT, "missing bot"),
+async fn suspended_org_owned_or_missing_service_user_cannot_read_tag_sad() {
+    let (base, tag_id) = service_user_fixture("Service user Hidden").await;
+    for (service_user_id, who) in [
+        (SUSPENDED_SERVICE_USER, "suspended service user"),
+        (ORG_SERVICE_USER, "org-owned service user"),
+        (MISSING_SERVICE_USER, "missing service user"),
     ] {
-        let bot = as_service(&base, &format!("bot:{bot_id}"));
-        assert_cannot_read(&bot, &tag_id, who).await;
+        let service_user = as_service(&base, &format!("svc:{service_user_id}"));
+        assert_cannot_read(&service_user, &tag_id, who).await;
     }
 }
 
 #[tokio::test]
-async fn non_bot_service_user_cannot_read_tag_sad() {
-    let (base, tag_id) = bot_fixture("Infra Hidden").await;
-    for service_name in ["spectra-ingest", "bot:", "robot:3f2b8c1e"] {
+async fn builtin_service_user_cannot_read_tag_sad() {
+    let (base, tag_id) = service_user_fixture("Infra Hidden").await;
+    for service_name in ["spectra-ingest", "svc:", "robot:3f2b8c1e"] {
         let infra = as_service(&base, service_name);
         assert_cannot_read(&infra, &tag_id, service_name).await;
     }
 }
 
+/// The retired `bot:<uuid>` name gets nothing, even for a uuid whose service
+/// user row is active.
 #[tokio::test]
-async fn active_bot_cannot_create_or_update_tag_sad() {
-    let (base, tag_id) = bot_fixture("Bot Read Only").await;
-    let bot = as_service(&base, &format!("bot:{ACTIVE_BOT}"));
+async fn legacy_bot_actor_cannot_read_tag_sad() {
+    let (base, tag_id) = service_user_fixture("Legacy Hidden").await;
+    let legacy = format!("bot:{ACTIVE_SERVICE_USER}");
+    assert_cannot_read(&as_service(&base, &legacy), &tag_id, &legacy).await;
+}
+
+#[tokio::test]
+async fn active_service_user_cannot_create_or_update_tag_sad() {
+    let (base, tag_id) = service_user_fixture("Service user Read Only").await;
+    let service_user = as_service(&base, &format!("svc:{ACTIVE_SERVICE_USER}"));
 
     let created = create(
         TagCreateInput {
-            name: "Filed By Bot".into(),
+            name: "Filed By Service user".into(),
             taxonomy: None,
             description: None,
         },
-        &bot,
+        &service_user,
     )
     .await;
     assert!(
         is_privacy_denial(&created),
-        "bot must not create a tag: {created:?}"
+        "service user must not create a tag: {created:?}"
     );
 
     let updated = update(
         &tag_id,
         TagUpdateInput {
-            name: Some("Renamed By Bot".into()),
+            name: Some("Renamed By Service user".into()),
             taxonomy: None,
             description: None,
         },
-        &bot,
+        &service_user,
     )
     .await;
     assert!(
         is_privacy_denial(&updated),
-        "bot must not update its owner's tag: {updated:?}"
+        "service user must not update its owner's tag: {updated:?}"
     );
 
     let owner_view = tag::get(&tag_id, &as_user(&base, TEST_USER_A))
         .await
         .expect("owner get")
         .expect("tag still exists");
-    assert_eq!(owner_view.name, "Bot Read Only");
-    let filed = tag::get_by_name("Filed By Bot", &as_user(&base, TEST_USER_A))
+    assert_eq!(owner_view.name, "Service user Read Only");
+    let filed = tag::get_by_name("Filed By Service user", &as_user(&base, TEST_USER_A))
         .await
         .expect("owner lookup");
-    assert!(filed.is_none(), "denied bot create must not leave a row");
+    assert!(
+        filed.is_none(),
+        "denied service user create must not leave a row"
+    );
 }

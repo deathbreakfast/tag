@@ -60,32 +60,32 @@ impl PolicyEvaluator for TagDataOwner {
 /// Shared [`TagDataOwner`] instance for use in schema `privacy_policies` declarations.
 pub const TAG_DATA_OWNER: TagDataOwner = TagDataOwner;
 
-/// `service_name` prefix lepton gives a bot's `Actor::ServiceUser`.
-const BOT_SERVICE_PREFIX: &str = "bot:";
+/// `service_name` prefix lepton gives a service user's `Actor::ServiceUser`.
+const SERVICE_USER_PREFIX: &str = "svc:";
 
-/// Privacy policy allowing a read when the actor is an active bot that acts
-/// for a user, so the bot sees the shared catalog the way its owner does.
+/// Privacy policy allowing a read when the actor is an active service user that acts
+/// for a user, so the service user sees the shared catalog the way its owner does.
 ///
-/// The actor must be an `Actor::ServiceUser` named `bot:<id>` whose stored
-/// `bot` row has `status` `active`, `owner_kind` `user` and a `user` owner.
+/// The actor must be an `Actor::ServiceUser` named `svc:<id>` whose stored
+/// `service_user_account` row has `status` `active`, `owner_kind` `user` and a `user` owner.
 /// Any other service user (ingest or infra workers) is denied. Use it on
 /// read only: writes stay with the owner rules.
 ///
-/// The `bot` row is read raw as the caller, because bots cannot read that
+/// The `service_user_account` row is read raw as the caller, because service users cannot read that
 /// table through privacy and the check must not elevate to look. The table
-/// and field names are lepton's; this crate does not depend on lepton's bot
+/// and field names are lepton's; this crate does not depend on lepton's service user
 /// types.
 #[derive(Debug, Clone, Copy)]
-pub struct TagReadActiveBot;
+pub struct TagReadActiveServiceUser;
 
 #[async_trait]
-impl PolicyEvaluator for TagReadActiveBot {
+impl PolicyEvaluator for TagReadActiveServiceUser {
     fn name(&self) -> &'static str {
-        "tag::TAG_READ_ACTIVE_BOT"
+        "tag::TAG_READ_ACTIVE_SERVICE_USER"
     }
 
     fn description(&self) -> Option<&'static str> {
-        Some("Allow read when the actor is an active bot owned by a user")
+        Some("Allow read when the actor is an active service user owned by a user")
     }
 
     async fn evaluate(
@@ -100,7 +100,7 @@ impl PolicyEvaluator for TagReadActiveBot {
         }
         let actor: Actor = serde_json::from_value(actor.actor_json().clone())
             .map_err(|e| Error::Internal(format!("invalid actor context: {e}")))?;
-        Ok(active_bot_owner(&actor, v).await?.is_some())
+        Ok(active_service_user_owner(&actor, v).await?.is_some())
     }
 
     fn as_any(&self) -> &dyn Any {
@@ -108,28 +108,28 @@ impl PolicyEvaluator for TagReadActiveBot {
     }
 }
 
-/// Shared [`TagReadActiveBot`] instance for use in schema `privacy_policies` declarations.
-pub const TAG_READ_ACTIVE_BOT: TagReadActiveBot = TagReadActiveBot;
+/// Shared [`TagReadActiveServiceUser`] instance for use in schema `privacy_policies` declarations.
+pub const TAG_READ_ACTIVE_SERVICE_USER: TagReadActiveServiceUser = TagReadActiveServiceUser;
 
-/// Bare owner id of the active bot `actor` acts as, or `None` when `actor` is
-/// not a bot, the bot is missing or not active, or it has no user owner.
-async fn active_bot_owner(actor: &Actor, v: &Valence) -> valence::Result<Option<String>> {
+/// Bare owner id of the active service user `actor` acts as, or `None` when `actor` is
+/// not a service user, the service user is missing or not active, or it has no user owner.
+async fn active_service_user_owner(actor: &Actor, v: &Valence) -> valence::Result<Option<String>> {
     let Actor::ServiceUser { service_name } = actor else {
         return Ok(None);
     };
-    let Some(bot_id) = service_name
-        .strip_prefix(BOT_SERVICE_PREFIX)
+    let Some(service_user_id) = service_name
+        .strip_prefix(SERVICE_USER_PREFIX)
         .filter(|id| !id.is_empty())
     else {
         return Ok(None);
     };
     let backend = v
-        .backend_for_table("bot")
-        .map_err(|e| Error::Privacy(format!("resolve bot backend: {e}")))?;
+        .backend_for_table("service_user_account")
+        .map_err(|e| Error::Privacy(format!("resolve service user backend: {e}")))?;
     let Some(row) = backend
-        .get_record("bot", bot_id)
+        .get_record("service_user_account", service_user_id)
         .await
-        .map_err(|e| Error::Privacy(format!("read bot: {e}")))?
+        .map_err(|e| Error::Privacy(format!("read service user: {e}")))?
     else {
         return Ok(None);
     };
