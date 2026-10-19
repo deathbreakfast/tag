@@ -1,5 +1,5 @@
 #[allow(unused_imports)]
-use crate::privacy_policies::{TAG_DATA_OWNER, TAG_READ_ACTIVE_BOT};
+use crate::privacy_policies::{TAG_DATA_OWNER, TAG_READ_ACTIVE_SERVICE_USER};
 use valence::prelude::*;
 use valence::privacy_policies::common::{AUTHENTICATED, SYSTEM_ONLY};
 
@@ -9,16 +9,16 @@ valence_schema! {
         table: "tag",
         version: "0.2.0",
         database: crate::embedded_surreal::DEFAULT_STORAGE,
-        description: "Shared tag catalog row (name, taxonomy, description). Any signed-in user, or an active bot acting for its owner, may read; any signed-in user may create; only the owner may update or delete.",
+        description: "Shared tag catalog row (name, taxonomy, description). Any signed-in user, or an active service user acting for its owner, may read; any signed-in user may create; only the owner may update or delete.",
 
         traits: [HistorySource],
 
         policies: {
             // Shared catalog: any signed-in user may read, and so may an active
-            // bot acting for its owner. Other service users are denied, and
-            // bots get no create, update or delete.
+            // service user acting for its owner. Other service users are denied, and
+            // service users get no create, update or delete.
             read: {
-                allow: [AUTHENTICATED, TAG_READ_ACTIVE_BOT, SYSTEM_ONLY],
+                allow: [AUTHENTICATED, TAG_READ_ACTIVE_SERVICE_USER, SYSTEM_ONLY],
             },
             create: {
                 allow: [AUTHENTICATED, SYSTEM_ONLY],
