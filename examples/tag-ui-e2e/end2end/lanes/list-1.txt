@@ -1,0 +1,6 @@
+catalog.spec.ts › pw-tag-list › pw-tag-list-load-happy
+catalog.spec.ts › pw-tag-list › pw-tag-search-miss-sad
+catalog.spec.ts › pw-tag-create › pw-tag-create-happy
+catalog.spec.ts › pw-tag-detail › pw-tag-update-happy
+catalog.spec.ts › pw-tag-detail › pw-tag-delete-happy
+catalog.spec.ts › pw-tag-detail › pw-tag-not-found-sad
