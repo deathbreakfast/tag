@@ -61,9 +61,11 @@ impl PolicyEvaluator for TagDataOwner {
 /// Shared [`TagDataOwner`] instance for use in schema `privacy_policies` declarations.
 pub const TAG_DATA_OWNER: TagDataOwner = TagDataOwner;
 
-/// Privacy policy allowing a signed-in user (or System). It stands in for Valence's
-/// `AUTHENTICATED`, which also admits every service user, so tag lists this rule where
-/// only people may act and leaves service users to [`TagReadActiveServiceUser`].
+/// Privacy policy allowing a signed-in user, and refusing every service user.
+///
+/// It stands in for Valence's `AUTHENTICATED`, which also admits every service user, so
+/// tag lists this rule where only people may act and leaves service users to
+/// [`TagReadActiveServiceUser`].
 #[derive(Debug, Clone, Copy)]
 pub struct TagSignedInUser;
 
