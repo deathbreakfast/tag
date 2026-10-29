@@ -181,13 +181,17 @@ struct CatalogSearch {
 impl CatalogSearch {
     /// Search the catalog on every `query` change and keep `seed` titles in
     /// the label cache.
-    fn watch(query: RwSignal<String>, seed: Signal<Vec<SearchSourceItem>>) -> Self {
-        let state = Self {
+    fn new() -> Self {
+        Self {
             results: RwSignal::new(Vec::new()),
             results_query: RwSignal::new(None),
             labels: RwSignal::new(HashMap::new()),
             error: RwSignal::new(None),
-        };
+        }
+    }
+
+    fn watch(query: RwSignal<String>, seed: Signal<Vec<SearchSourceItem>>) -> Self {
+        let state = Self::new();
         let request_seq = StoredValue::new(RequestSequence::default());
         let source_keys = vec![SearchSourceKey::new(
             TagSearchSourceId::Catalog.as_str(),
@@ -207,22 +211,48 @@ impl CatalogSearch {
             spawn_local_scoped(async move {
                 let arg = (!q.is_empty()).then(|| q.clone());
                 let outcome = search_tag_catalog(keys, arg, CATALOG_LIMIT).await;
-                if !request_seq.with_value(|seq| seq.is_latest(ticket)) {
-                    return;
-                }
-                match outcome {
-                    Ok(rows) => {
-                        state.labels.update(|cache| remember_labels(cache, &rows));
-                        state.results.set(rows);
-                        state.results_query.set(Some(q));
-                        state.error.set(None);
-                    }
-                    Err(err) => state.error.set(Some(err.to_string())),
-                }
+                state.apply_response(request_seq, ticket, q, outcome);
             });
         });
 
         state
+    }
+
+    /// Store one search response, unless a newer search has started since.
+    ///
+    /// The picker can be unmounted while a search is in flight (a dialog around
+    /// it re-renders). Its signals are disposed by then, so a late response is
+    /// dropped instead of written.
+    fn apply_response<E: std::fmt::Display>(
+        self,
+        request_seq: StoredValue<RequestSequence>,
+        ticket: u32,
+        q: String,
+        outcome: Result<Vec<SearchSourceItem>, E>,
+    ) {
+        let latest = request_seq
+            .try_with_value(|seq| seq.is_latest(ticket))
+            .unwrap_or(false);
+        if !latest {
+            return;
+        }
+        match outcome {
+            Ok(rows) => {
+                if self
+                    .labels
+                    .try_update(|cache| remember_labels(cache, &rows))
+                    .is_none()
+                {
+                    return;
+                }
+                let _ = self.results.try_set(rows);
+                let _ = self.results_query.try_set(Some(q));
+                let _ = self.error.try_set(None);
+            }
+            Err(err) => {
+                let _ = self.error.try_set(Some(err.to_string()));
+            }
+        }
     }
 }
 
@@ -284,7 +314,8 @@ fn create_offer_text(
 
 #[cfg(test)]
 mod tests {
-    use super::{create_offer_text, label_for, remember_labels, RequestSequence};
+    use super::{create_offer_text, label_for, remember_labels, CatalogSearch, RequestSequence};
+    use leptos::prelude::*;
     use std::collections::HashMap;
     use uf_search_core::SearchSourceItem;
 
@@ -369,5 +400,49 @@ mod tests {
     #[test]
     fn no_create_when_allow_create_false_sad() {
         assert!(create_offer_text("Groceries", &[], &[], false).is_none());
+    }
+
+    /// A search state and one in-flight ticket, created under `owner`.
+    fn in_flight(owner: &Owner) -> (CatalogSearch, StoredValue<RequestSequence>, u32) {
+        owner.with(|| {
+            let state = CatalogSearch::new();
+            let seq = StoredValue::new(RequestSequence::default());
+            let mut ticket = 0;
+            seq.update_value(|s| ticket = s.next());
+            (state, seq, ticket)
+        })
+    }
+
+    #[test]
+    fn search_response_fills_results_happy() {
+        let owner = Owner::new();
+        let (state, seq, ticket) = in_flight(&owner);
+        state.apply_response(seq, ticket, "fin".into(), Ok::<_, String>(vec![item("1", "Finance")]));
+        assert_eq!(state.results.get_untracked(), vec![item("1", "Finance")]);
+        assert_eq!(state.results_query.get_untracked().as_deref(), Some("fin"));
+        assert_eq!(state.labels.with_untracked(|c| label_for(c, "1")), "Finance");
+    }
+
+    #[test]
+    fn superseded_search_response_is_dropped_sad() {
+        let owner = Owner::new();
+        let (state, seq, stale) = in_flight(&owner);
+        seq.update_value(|s| {
+            s.next();
+        });
+        state.apply_response(seq, stale, "fin".into(), Ok::<_, String>(vec![item("1", "Finance")]));
+        assert!(state.results.get_untracked().is_empty());
+        assert_eq!(state.results_query.get_untracked(), None);
+    }
+
+    #[test]
+    fn search_response_after_unmount_is_dropped_sad() {
+        let owner = Owner::new();
+        let (state, seq, ticket) = in_flight(&owner);
+        owner.cleanup();
+        // Used to panic reading the disposed request sequence (a wasm trap in the browser).
+        state.apply_response(seq, ticket, "fin".into(), Ok::<_, String>(vec![item("1", "Finance")]));
+        state.apply_response(seq, ticket, "fin".into(), Err::<Vec<_>, _>("offline"));
+        assert!(state.results.try_get_untracked().is_none());
     }
 }

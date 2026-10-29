@@ -9,3 +9,4 @@ target-*/
 **/test-results/
 **/playwright-report/
 examples/tag-ui-e2e/site/pkg/
+examples/tag-ui-e2e/site/fonts/

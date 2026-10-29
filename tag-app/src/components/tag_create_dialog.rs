@@ -94,11 +94,7 @@ pub fn TagCreateDialog(
         }
     });
 
-    let finish = move |tag: TagDetailDto| {
-        submitting.set(false);
-        open.set(false);
-        on_created.run(tag);
-    };
+    let finish = move |tag: TagDetailDto| finish_create(submitting, open, on_created, tag);
 
     let on_create = move |_| {
         if submitting.get_untracked() {
@@ -180,6 +176,22 @@ pub fn TagCreateDialog(
     }
 }
 
+/// Close the dialog and hand `tag` to `on_created`.
+///
+/// Runs after a server round trip, when the dialog (and the owner of
+/// `on_created`) may already be gone. Writes to disposed signals are no-ops, but
+/// running a disposed callback panics, so a late result is dropped instead.
+fn finish_create(
+    submitting: RwSignal<bool>,
+    open: RwSignal<bool>,
+    on_created: Callback<TagDetailDto>,
+    tag: TagDetailDto,
+) {
+    submitting.set(false);
+    open.set(false);
+    let _ = on_created.try_run(tag);
+}
+
 /// Warning shown when the typed name already belongs to a tag.
 #[component]
 fn DuplicateNameNotice(
@@ -234,7 +246,52 @@ fn CreateDialogActions(
 
 #[cfg(test)]
 mod tests {
-    use super::tag_create_input;
+    use super::{finish_create, tag_create_input};
+    use leptos::prelude::*;
+    use tag::types::TagDetailDto;
+
+    fn tag(name: &str) -> TagDetailDto {
+        TagDetailDto {
+            id: "t1".into(),
+            name: name.into(),
+            taxonomy: None,
+            description: None,
+            owner_display: "you".into(),
+            created_at: Default::default(),
+            updated_at: Default::default(),
+        }
+    }
+
+    #[test]
+    fn finish_closes_dialog_and_hands_over_tag_happy() {
+        let owner = Owner::new();
+        owner.with(|| {
+            let submitting = RwSignal::new(true);
+            let open = RwSignal::new(true);
+            let got = RwSignal::new(None::<String>);
+            let on_created = Callback::new(move |t: TagDetailDto| got.set(Some(t.name)));
+            finish_create(submitting, open, on_created, tag("Ops"));
+            assert!(!submitting.get_untracked());
+            assert!(!open.get_untracked());
+            assert_eq!(got.get_untracked().as_deref(), Some("Ops"));
+        });
+    }
+
+    #[test]
+    fn finish_after_unmount_is_dropped_sad() {
+        let owner = Owner::new();
+        let (submitting, open, on_created) = owner.with(|| {
+            (
+                RwSignal::new(true),
+                RwSignal::new(true),
+                Callback::new(|_: TagDetailDto| {}),
+            )
+        });
+        owner.cleanup();
+        // Used to panic running the disposed callback (a wasm trap in the browser).
+        finish_create(submitting, open, on_created, tag("Ops"));
+        assert!(open.try_get_untracked().is_none());
+    }
 
     #[test]
     fn blank_optional_fields_become_none() {
