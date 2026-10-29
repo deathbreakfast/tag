@@ -1,6 +1,7 @@
 //! Reusable privacy policy rules for tag Valence schemas.
 
 use async_trait::async_trait;
+use lepton_identity::service_users::active_service_user_owner;
 use std::any::Any;
 use valence::ownership::OwnershipService;
 use valence::{Actor, ActorContext, Error, PolicyEvaluator, PrivacyOperation, Valence};
@@ -60,21 +61,57 @@ impl PolicyEvaluator for TagDataOwner {
 /// Shared [`TagDataOwner`] instance for use in schema `privacy_policies` declarations.
 pub const TAG_DATA_OWNER: TagDataOwner = TagDataOwner;
 
-/// `service_name` prefix lepton gives a service user's `Actor::ServiceUser`.
-const SERVICE_USER_PREFIX: &str = "svc:";
+/// Privacy policy allowing a signed-in user, and refusing every service user.
+///
+/// It stands in for Valence's `AUTHENTICATED`, which also admits every service user, so
+/// tag lists this rule where only people may act and leaves service users to
+/// [`TagReadActiveServiceUser`].
+#[derive(Debug, Clone, Copy)]
+pub struct TagSignedInUser;
+
+#[async_trait]
+impl PolicyEvaluator for TagSignedInUser {
+    fn name(&self) -> &'static str {
+        "tag::TAG_SIGNED_IN_USER"
+    }
+
+    fn description(&self) -> Option<&'static str> {
+        Some("Allow a signed-in user; service users are refused")
+    }
+
+    async fn evaluate(
+        &self,
+        _op: PrivacyOperation,
+        _record: &serde_json::Value,
+        actor: &dyn ActorContext,
+        _v: &Valence,
+    ) -> valence::Result<bool> {
+        let actor: Actor = serde_json::from_value(actor.actor_json().clone())
+            .map_err(|e| Error::Internal(format!("invalid actor context: {e}")))?;
+        Ok(actor.is_user())
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+}
+
+/// Shared [`TagSignedInUser`] instance for use in schema `privacy_policies` declarations.
+pub const TAG_SIGNED_IN_USER: TagSignedInUser = TagSignedInUser;
 
 /// Privacy policy allowing a read when the actor is an active service user that acts
 /// for a user, so the service user sees the shared catalog the way its owner does.
 ///
-/// The actor must be an `Actor::ServiceUser` named `svc:<id>` whose stored
-/// `service_user_account` row has `status` `active`, `owner_kind` `user` and a `user` owner.
-/// Any other service user (ingest or infra workers) is denied. Use it on
-/// read only: writes stay with the owner rules.
+/// The actor must be an `Actor::ServiceUser` that Lepton's
+/// [`active_service_user_owner`] resolves to an owning user: a canonical `svc:<id>`
+/// name whose stored row is `active`, not pending deletion, and has a `user` owner.
+/// Any other service user (ingest or infra workers) is denied. Use it on read only:
+/// writes stay with the owner rules.
 ///
-/// The `service_user_account` row is read raw as the caller, because service users cannot read that
-/// table through privacy and the check must not elevate to look. The table
-/// and field names are lepton's; this crate does not depend on lepton's service user
-/// types.
+/// Lepton's `SERVICE_USER_ACTIVE` rule matches rows through a `user` field, which tag
+/// rows do not have (ownership lives in `valence_data_ownership`), so this rule
+/// calls the resolver directly. The resolver reads the row from the backend, so the
+/// check does not elevate the caller.
 #[derive(Debug, Clone, Copy)]
 pub struct TagReadActiveServiceUser;
 
@@ -100,7 +137,10 @@ impl PolicyEvaluator for TagReadActiveServiceUser {
         }
         let actor: Actor = serde_json::from_value(actor.actor_json().clone())
             .map_err(|e| Error::Internal(format!("invalid actor context: {e}")))?;
-        Ok(active_service_user_owner(&actor, v).await?.is_some())
+        let Actor::ServiceUser { service_name } = &actor else {
+            return Ok(false);
+        };
+        Ok(active_service_user_owner(service_name, v).await.is_some())
     }
 
     fn as_any(&self) -> &dyn Any {
@@ -110,36 +150,3 @@ impl PolicyEvaluator for TagReadActiveServiceUser {
 
 /// Shared [`TagReadActiveServiceUser`] instance for use in schema `privacy_policies` declarations.
 pub const TAG_READ_ACTIVE_SERVICE_USER: TagReadActiveServiceUser = TagReadActiveServiceUser;
-
-/// Bare owner id of the active service user `actor` acts as, or `None` when `actor` is
-/// not a service user, the service user is missing or not active, or it has no user owner.
-async fn active_service_user_owner(actor: &Actor, v: &Valence) -> valence::Result<Option<String>> {
-    let Actor::ServiceUser { service_name } = actor else {
-        return Ok(None);
-    };
-    let Some(service_user_id) = service_name
-        .strip_prefix(SERVICE_USER_PREFIX)
-        .filter(|id| !id.is_empty())
-    else {
-        return Ok(None);
-    };
-    let backend = v
-        .backend_for_table("service_user_account")
-        .map_err(|e| Error::Privacy(format!("resolve service user backend: {e}")))?;
-    let Some(row) = backend
-        .get_record("service_user_account", service_user_id)
-        .await
-        .map_err(|e| Error::Privacy(format!("read service user: {e}")))?
-    else {
-        return Ok(None);
-    };
-    let active = row.get("status").and_then(|s| s.as_str()) == Some("active");
-    let user_owned = row.get("owner_kind").and_then(|s| s.as_str()) == Some("user");
-    if !(active && user_owned) {
-        return Ok(None);
-    }
-    Ok(row
-        .get("user")
-        .and_then(|user| valence::extract_id_from_select_value(user).ok())
-        .filter(|id| !id.trim().is_empty()))
-}
