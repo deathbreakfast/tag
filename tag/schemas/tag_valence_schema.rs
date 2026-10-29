@@ -1,7 +1,7 @@
 #[allow(unused_imports)]
-use crate::privacy_policies::{TAG_DATA_OWNER, TAG_READ_ACTIVE_SERVICE_USER};
+use crate::privacy_policies::{TAG_DATA_OWNER, TAG_READ_ACTIVE_SERVICE_USER, TAG_SIGNED_IN_USER};
 use valence::prelude::*;
-use valence::privacy_policies::common::{AUTHENTICATED, SYSTEM_ONLY};
+use valence::privacy_policies::common::SYSTEM_ONLY;
 
 valence_schema! {
     Tag {
@@ -18,10 +18,10 @@ valence_schema! {
             // service user acting for its owner. Other service users are denied, and
             // service users get no create, update or delete.
             read: {
-                allow: [AUTHENTICATED, TAG_READ_ACTIVE_SERVICE_USER, SYSTEM_ONLY],
+                allow: [TAG_SIGNED_IN_USER, TAG_READ_ACTIVE_SERVICE_USER, SYSTEM_ONLY],
             },
             create: {
-                allow: [AUTHENTICATED, SYSTEM_ONLY],
+                allow: [TAG_SIGNED_IN_USER, SYSTEM_ONLY],
             },
             update: {
                 allow: [TAG_DATA_OWNER, SYSTEM_ONLY],

@@ -61,6 +61,42 @@ impl PolicyEvaluator for TagDataOwner {
 /// Shared [`TagDataOwner`] instance for use in schema `privacy_policies` declarations.
 pub const TAG_DATA_OWNER: TagDataOwner = TagDataOwner;
 
+/// Privacy policy allowing a signed-in user (or System). It stands in for Valence's
+/// `AUTHENTICATED`, which also admits every service user, so tag lists this rule where
+/// only people may act and leaves service users to [`TagReadActiveServiceUser`].
+#[derive(Debug, Clone, Copy)]
+pub struct TagSignedInUser;
+
+#[async_trait]
+impl PolicyEvaluator for TagSignedInUser {
+    fn name(&self) -> &'static str {
+        "tag::TAG_SIGNED_IN_USER"
+    }
+
+    fn description(&self) -> Option<&'static str> {
+        Some("Allow a signed-in user; service users are refused")
+    }
+
+    async fn evaluate(
+        &self,
+        _op: PrivacyOperation,
+        _record: &serde_json::Value,
+        actor: &dyn ActorContext,
+        _v: &Valence,
+    ) -> valence::Result<bool> {
+        let actor: Actor = serde_json::from_value(actor.actor_json().clone())
+            .map_err(|e| Error::Internal(format!("invalid actor context: {e}")))?;
+        Ok(actor.is_user())
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+}
+
+/// Shared [`TagSignedInUser`] instance for use in schema `privacy_policies` declarations.
+pub const TAG_SIGNED_IN_USER: TagSignedInUser = TagSignedInUser;
+
 /// Privacy policy allowing a read when the actor is an active service user that acts
 /// for a user, so the service user sees the shared catalog the way its owner does.
 ///

@@ -294,20 +294,25 @@ async fn tag_history_schema_has_source_edge_for_defer() {
 
 const ACTIVE_SERVICE_USER: &str = "3f2b8c1e-5d4a-4e7b-9c10-0a1b2c3d4e5f";
 const SUSPENDED_SERVICE_USER: &str = "7a9d2e4b-1c3f-4a6e-8b5d-2e4f6a8c0b1d";
-const ORG_SERVICE_USER: &str = "c4e6a8b0-2d4f-4a1c-9e3b-5d7f9a1b3c5e";
+const OWNERLESS_SERVICE_USER: &str = "c4e6a8b0-2d4f-4a1c-9e3b-5d7f9a1b3c5e";
 const MISSING_SERVICE_USER: &str = "00000000-0000-4000-8000-000000000000";
 
-async fn seed_service_user(system: &valence::Valence, id: &str, owner_kind: &str, status: &str) {
+async fn seed_service_user(system: &valence::Valence, id: &str, has_owner: bool, status: &str) {
     let backend = system
         .backend_for_table("service_user_account")
         .expect("service user backend");
     let mut row = serde_json::json!({
         "id": id,
-        "owner_kind": owner_kind,
+        "owner_kind": "user",
+        "handle": &id[..8],
+        "handle_key": &id[..8],
+        "display_name": "Test service user",
         "status": status,
+        "created_at": Utc::now().timestamp(),
+        "updated_at": Utc::now().timestamp(),
     });
-    // An org-owned service user has no `user` owner for the resolver to find.
-    if owner_kind == "user" {
+    // The resolver finds the owner through `user`, so a row without one resolves to nothing.
+    if has_owner {
         row["user"] =
             serde_json::to_value(RecordId::new("user", TEST_USER_A)).expect("owner record");
     }
@@ -326,9 +331,9 @@ fn as_service(base: &valence::Valence, service_name: &str) -> valence::Valence {
 /// Shared DB with the service user fixtures and one tag created by `TEST_USER_A`.
 async fn service_user_fixture(name: &str) -> (valence::Valence, String) {
     let base = setup_shared_db().await;
-    seed_service_user(&base, ACTIVE_SERVICE_USER, "user", "active").await;
-    seed_service_user(&base, SUSPENDED_SERVICE_USER, "user", "suspended").await;
-    seed_service_user(&base, ORG_SERVICE_USER, "org", "active").await;
+    seed_service_user(&base, ACTIVE_SERVICE_USER, true, "active").await;
+    seed_service_user(&base, SUSPENDED_SERVICE_USER, true, "suspended").await;
+    seed_service_user(&base, OWNERLESS_SERVICE_USER, false, "active").await;
     let created = create(
         TagCreateInput {
             name: name.into(),
@@ -389,11 +394,11 @@ async fn active_service_user_reads_and_lists_shared_tag_happy_path() {
 }
 
 #[tokio::test]
-async fn suspended_org_owned_or_missing_service_user_cannot_read_tag_sad() {
+async fn suspended_ownerless_or_missing_service_user_cannot_read_tag_sad() {
     let (base, tag_id) = service_user_fixture("Service user Hidden").await;
     for (service_user_id, who) in [
         (SUSPENDED_SERVICE_USER, "suspended service user"),
-        (ORG_SERVICE_USER, "org-owned service user"),
+        (OWNERLESS_SERVICE_USER, "service user without an owner"),
         (MISSING_SERVICE_USER, "missing service user"),
     ] {
         let service_user = as_service(&base, &format!("svc:{service_user_id}"));
