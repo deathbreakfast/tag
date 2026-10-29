@@ -290,7 +290,7 @@ async fn tag_history_schema_has_source_edge_for_defer() {
 
 // Service users act as `Actor::ServiceUser { service_name: "svc:<id>" }`. The
 // `service_user_account` table belongs to lepton and is not registered in this test graph, so
-// the fixture writes its rows raw, the way `TAG_READ_ACTIVE_SERVICE_USER` reads them.
+// the fixture writes its rows raw, the way Lepton's resolver reads them.
 
 const ACTIVE_SERVICE_USER: &str = "3f2b8c1e-5d4a-4e7b-9c10-0a1b2c3d4e5f";
 const SUSPENDED_SERVICE_USER: &str = "7a9d2e4b-1c3f-4a6e-8b5d-2e4f6a8c0b1d";
@@ -301,12 +301,16 @@ async fn seed_service_user(system: &valence::Valence, id: &str, owner_kind: &str
     let backend = system
         .backend_for_table("service_user_account")
         .expect("service user backend");
-    let row = serde_json::json!({
+    let mut row = serde_json::json!({
         "id": id,
-        "user": serde_json::to_value(RecordId::new("user", TEST_USER_A)).expect("owner record"),
         "owner_kind": owner_kind,
         "status": status,
     });
+    // An org-owned service user has no `user` owner for the resolver to find.
+    if owner_kind == "user" {
+        row["user"] =
+            serde_json::to_value(RecordId::new("user", TEST_USER_A)).expect("owner record");
+    }
     backend
         .upsert_record("service_user_account", id, row)
         .await
@@ -400,9 +404,23 @@ async fn suspended_org_owned_or_missing_service_user_cannot_read_tag_sad() {
 #[tokio::test]
 async fn builtin_service_user_cannot_read_tag_sad() {
     let (base, tag_id) = service_user_fixture("Infra Hidden").await;
-    for service_name in ["spectra-ingest", "svc:", "robot:3f2b8c1e"] {
+    for service_name in ["spectra-ingest", "cron", "svc:", "robot:3f2b8c1e"] {
         let infra = as_service(&base, service_name);
         assert_cannot_read(&infra, &tag_id, service_name).await;
+    }
+}
+
+/// A service name that is not the canonical `svc:<uuid>` form gets nothing, even
+/// when the uuid inside it names an active service user.
+#[tokio::test]
+async fn non_canonical_service_user_name_cannot_read_tag_sad() {
+    let (base, tag_id) = service_user_fixture("Non Canonical Hidden").await;
+    for name in [
+        format!("svc:{}", ACTIVE_SERVICE_USER.to_uppercase()),
+        format!("svc: {ACTIVE_SERVICE_USER}"),
+        format!("svc:{ACTIVE_SERVICE_USER}/x"),
+    ] {
+        assert_cannot_read(&as_service(&base, &name), &tag_id, &name).await;
     }
 }
 
