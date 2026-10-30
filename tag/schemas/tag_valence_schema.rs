@@ -1,7 +1,7 @@
 #[allow(unused_imports)]
-use crate::privacy_policies::TAG_DATA_OWNER;
+use crate::privacy_policies::{TAG_DATA_OWNER, TAG_READ_ACTIVE_SERVICE_USER, TAG_SIGNED_IN_USER};
 use valence::prelude::*;
-use valence::privacy_policies::common::{AUTHENTICATED, SYSTEM_ONLY};
+use valence::privacy_policies::common::SYSTEM_ONLY;
 
 valence_schema! {
     Tag {
@@ -9,17 +9,19 @@ valence_schema! {
         table: "tag",
         version: "0.2.0",
         database: crate::embedded_surreal::DEFAULT_STORAGE,
-        description: "Shared tag catalog row (name, taxonomy, description)",
+        description: "Shared tag catalog row (name, taxonomy, description). Any signed-in user, or an active service user acting for its owner, may read; any signed-in user may create; only the owner may update or delete.",
 
         traits: [HistorySource],
 
         policies: {
-            // Shared/public catalog: any authenticated actor may read; mutations stay owner-scoped.
+            // Shared catalog: any signed-in user may read, and so may an active
+            // service user acting for its owner. Other service users are denied, and
+            // service users get no create, update or delete.
             read: {
-                allow: [AUTHENTICATED, SYSTEM_ONLY],
+                allow: [TAG_SIGNED_IN_USER, TAG_READ_ACTIVE_SERVICE_USER, SYSTEM_ONLY],
             },
             create: {
-                allow: [AUTHENTICATED, SYSTEM_ONLY],
+                allow: [TAG_SIGNED_IN_USER, SYSTEM_ONLY],
             },
             update: {
                 allow: [TAG_DATA_OWNER, SYSTEM_ONLY],

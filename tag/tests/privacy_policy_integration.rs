@@ -287,3 +287,201 @@ async fn tag_history_schema_has_source_edge_for_defer() {
         "expected source edge/field; connections={conn_names:?} fields={field_names:?}"
     );
 }
+
+// Service users act as `Actor::ServiceUser { service_name: "svc:<id>" }`. The
+// `service_user_account` table belongs to lepton and is not registered in this test graph, so
+// the fixture writes its rows raw, the way Lepton's resolver reads them.
+
+const ACTIVE_SERVICE_USER: &str = "3f2b8c1e-5d4a-4e7b-9c10-0a1b2c3d4e5f";
+const SUSPENDED_SERVICE_USER: &str = "7a9d2e4b-1c3f-4a6e-8b5d-2e4f6a8c0b1d";
+const OWNERLESS_SERVICE_USER: &str = "c4e6a8b0-2d4f-4a1c-9e3b-5d7f9a1b3c5e";
+const MISSING_SERVICE_USER: &str = "00000000-0000-4000-8000-000000000000";
+
+async fn seed_service_user(system: &valence::Valence, id: &str, has_owner: bool, status: &str) {
+    let backend = system
+        .backend_for_table("service_user_account")
+        .expect("service user backend");
+    let mut row = serde_json::json!({
+        "id": id,
+        "owner_kind": "user",
+        "handle": &id[..8],
+        "handle_key": &id[..8],
+        "display_name": "Test service user",
+        "status": status,
+        "created_at": Utc::now().timestamp(),
+        "updated_at": Utc::now().timestamp(),
+    });
+    // The resolver finds the owner through `user`, so a row without one resolves to nothing.
+    if has_owner {
+        row["user"] =
+            serde_json::to_value(RecordId::new("user", TEST_USER_A)).expect("owner record");
+    }
+    backend
+        .upsert_record("service_user_account", id, row)
+        .await
+        .expect("seed service user");
+}
+
+fn as_service(base: &valence::Valence, service_name: &str) -> valence::Valence {
+    base.with_actor(valence::Actor::ServiceUser {
+        service_name: service_name.to_string(),
+    })
+}
+
+/// Shared DB with the service user fixtures and one tag created by `TEST_USER_A`.
+async fn service_user_fixture(name: &str) -> (valence::Valence, String) {
+    let base = setup_shared_db().await;
+    seed_service_user(&base, ACTIVE_SERVICE_USER, true, "active").await;
+    seed_service_user(&base, SUSPENDED_SERVICE_USER, true, "suspended").await;
+    seed_service_user(&base, OWNERLESS_SERVICE_USER, false, "active").await;
+    let created = create(
+        TagCreateInput {
+            name: name.into(),
+            taxonomy: Some("spend".into()),
+            description: None,
+        },
+        &as_user(&base, TEST_USER_A),
+    )
+    .await
+    .expect("owner creates tag");
+    (base, created.id)
+}
+
+/// The actor cannot see the tag: `get` finds nothing and `list` leaves it out.
+async fn assert_cannot_read(v: &valence::Valence, tag_id: &str, who: &str) {
+    let got = tag::get(tag_id, v)
+        .await
+        .expect("denied get is not an error");
+    assert!(got.is_none(), "{who} must not read the tag, got {got:?}");
+    let rows = tag::list(v, None, None)
+        .await
+        .expect("denied list is not an error");
+    assert!(
+        rows.iter().all(|r| r.id != tag_id),
+        "{who} list must not include the tag"
+    );
+}
+
+/// A write refused by Valence privacy, as the service reports it.
+fn is_privacy_denial<T>(result: &Result<T, tag::TagError>) -> bool {
+    match result {
+        Err(tag::TagError::AccessDenied { .. }) => true,
+        Err(tag::TagError::Service { source, .. }) => source.to_string().contains("Access denied"),
+        _ => false,
+    }
+}
+
+#[tokio::test]
+async fn active_service_user_reads_and_lists_shared_tag_happy_path() {
+    let (base, tag_id) = service_user_fixture("Service user Visible").await;
+    let service_user = as_service(&base, &format!("svc:{ACTIVE_SERVICE_USER}"));
+
+    let seen = tag::get(&tag_id, &service_user)
+        .await
+        .expect("service user get")
+        .expect("active service user must read the shared catalog tag");
+    assert_eq!(seen.name, "Service user Visible");
+
+    let listed = tag::list(&service_user, None, None)
+        .await
+        .expect("service user list");
+    assert!(
+        listed
+            .iter()
+            .any(|r| r.id == tag_id && r.name == "Service user Visible"),
+        "active service user list must include the owner-created tag"
+    );
+}
+
+#[tokio::test]
+async fn suspended_ownerless_or_missing_service_user_cannot_read_tag_sad() {
+    let (base, tag_id) = service_user_fixture("Service user Hidden").await;
+    for (service_user_id, who) in [
+        (SUSPENDED_SERVICE_USER, "suspended service user"),
+        (OWNERLESS_SERVICE_USER, "service user without an owner"),
+        (MISSING_SERVICE_USER, "missing service user"),
+    ] {
+        let service_user = as_service(&base, &format!("svc:{service_user_id}"));
+        assert_cannot_read(&service_user, &tag_id, who).await;
+    }
+}
+
+#[tokio::test]
+async fn builtin_service_user_cannot_read_tag_sad() {
+    let (base, tag_id) = service_user_fixture("Infra Hidden").await;
+    for service_name in ["spectra-ingest", "cron", "svc:", "robot:3f2b8c1e"] {
+        let infra = as_service(&base, service_name);
+        assert_cannot_read(&infra, &tag_id, service_name).await;
+    }
+}
+
+/// A service name that is not the canonical `svc:<uuid>` form gets nothing, even
+/// when the uuid inside it names an active service user.
+#[tokio::test]
+async fn non_canonical_service_user_name_cannot_read_tag_sad() {
+    let (base, tag_id) = service_user_fixture("Non Canonical Hidden").await;
+    for name in [
+        format!("svc:{}", ACTIVE_SERVICE_USER.to_uppercase()),
+        format!("svc: {ACTIVE_SERVICE_USER}"),
+        format!("svc:{ACTIVE_SERVICE_USER}/x"),
+    ] {
+        assert_cannot_read(&as_service(&base, &name), &tag_id, &name).await;
+    }
+}
+
+/// The retired `bot:<uuid>` name gets nothing, even for a uuid whose service
+/// user row is active.
+#[tokio::test]
+async fn legacy_bot_actor_cannot_read_tag_sad() {
+    let (base, tag_id) = service_user_fixture("Legacy Hidden").await;
+    let legacy = format!("bot:{ACTIVE_SERVICE_USER}");
+    assert_cannot_read(&as_service(&base, &legacy), &tag_id, &legacy).await;
+}
+
+#[tokio::test]
+async fn active_service_user_cannot_create_or_update_tag_sad() {
+    let (base, tag_id) = service_user_fixture("Service user Read Only").await;
+    let service_user = as_service(&base, &format!("svc:{ACTIVE_SERVICE_USER}"));
+
+    let created = create(
+        TagCreateInput {
+            name: "Filed By Service user".into(),
+            taxonomy: None,
+            description: None,
+        },
+        &service_user,
+    )
+    .await;
+    assert!(
+        is_privacy_denial(&created),
+        "service user must not create a tag: {created:?}"
+    );
+
+    let updated = update(
+        &tag_id,
+        TagUpdateInput {
+            name: Some("Renamed By Service user".into()),
+            taxonomy: None,
+            description: None,
+        },
+        &service_user,
+    )
+    .await;
+    assert!(
+        is_privacy_denial(&updated),
+        "service user must not update its owner's tag: {updated:?}"
+    );
+
+    let owner_view = tag::get(&tag_id, &as_user(&base, TEST_USER_A))
+        .await
+        .expect("owner get")
+        .expect("tag still exists");
+    assert_eq!(owner_view.name, "Service user Read Only");
+    let filed = tag::get_by_name("Filed By Service user", &as_user(&base, TEST_USER_A))
+        .await
+        .expect("owner lookup");
+    assert!(
+        filed.is_none(),
+        "denied service user create must not leave a row"
+    );
+}
