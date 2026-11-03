@@ -45,7 +45,7 @@ No monorepo sibling clones. `tag-app` hydrate is not a CI job; the `e2e` job run
 |-----|----------|
 | **fmt** | `cargo fmt -p tag -p protected-tag-host -- --check` |
 | **clippy** | `cargo clippy -p tag --all-targets --features ssr -- -D warnings` then `cargo clippy -p protected-tag-host --all-targets -- -D warnings` |
-| **test** | `cargo test -p tag --test workspace_members --test product_surface`; domain `--features ssr` contract suites; `cargo check` + `cargo run -p protected-tag-host` |
+| **test** | `cargo test -p tag --test workspace_members --test product_surface`; domain `--features ssr` contract suites; `cargo test -p tag-app --features ssr --lib`; `cargo check` + `cargo run -p protected-tag-host` |
 | **docs** | `RUSTDOCFLAGS="-D rustdoc::broken-intra-doc-links" cargo doc -p tag --features ssr --no-deps` |
 | **e2e** | `cd examples/tag-ui-e2e/end2end && LANES=4 ./run-lanes.sh` |
 
