@@ -144,7 +144,7 @@ fn TagDetailEditor(row: TagDetailDto, tag_id: String, refresh: RwSignal<u32>) ->
                         <A href="/tag" attr:data-testid="tag-detail-back">
                             <Caption1>"← Tags"</Caption1>
                         </A>
-                        <div attr:data-testid="tag-detail-title">
+                        <div data-testid="tag-detail-title">
                             <Title3>{row.name.clone()}</Title3>
                         </div>
                     </Flex>
@@ -172,17 +172,17 @@ fn TagDetailEditor(row: TagDetailDto, tag_id: String, refresh: RwSignal<u32>) ->
             <Card>
                 <Flex vertical=true gap=FlexGap::Medium padding=SpacingSize::Size200.inset()>
                     <Field label="Name">
-                        <div attr:data-testid="tag-detail-name">
+                        <div data-testid="tag-detail-name">
                             <Input bind=name />
                         </div>
                     </Field>
                     <Field label="Taxonomy">
-                        <div attr:data-testid="tag-detail-taxonomy">
+                        <div data-testid="tag-detail-taxonomy">
                             <Input bind=taxonomy />
                         </div>
                     </Field>
                     <Field label="Description">
-                        <div attr:data-testid="tag-detail-description">
+                        <div data-testid="tag-detail-description">
                             <Textarea bind=description />
                         </div>
                     </Field>
