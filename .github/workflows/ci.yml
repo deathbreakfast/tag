@@ -1,6 +1,6 @@
 # PR / merge gate aligned with docs/VERIFICATION.md.
 # Standalone checkout — UF deps resolve via git branch = main on unified-field-dev.
-# tag-app / Playwright stay local (see VERIFICATION.md Layer 2).
+# tag-app hydrate stays local; the tag-ui-e2e Playwright suite runs in the e2e job.
 name: CI
 
 on:
@@ -99,3 +99,42 @@ jobs:
         run: |
           cargo install cargo-audit --locked
           cargo audit
+
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      RUSTFLAGS: ""
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - uses: dtolnay/rust-toolchain@2c7215f132e9ebf062739d9130488b56d53c060c # master (pin)
+        with:
+          toolchain: nightly-2026-08-07
+          targets: wasm32-unknown-unknown
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: examples/tag-ui-e2e/end2end/package-lock.json
+      - name: Install cargo-leptos
+        run: cargo install cargo-leptos --locked
+      - name: Install npm deps and Chromium
+        working-directory: examples/tag-ui-e2e/end2end
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+      # run-lanes.sh builds the lab host, then exits non-zero on a failed
+      # build, a failed, missing or duplicated test, or a server that never
+      # became ready (cargo leptos end-to-end exits 0 on those).
+      - name: Playwright (4 lanes)
+        working-directory: examples/tag-ui-e2e/end2end
+        env:
+          LANES: "4"
+        run: ./run-lanes.sh
+      - name: Upload lane output
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: e2e-lanes-out
+          path: examples/tag-ui-e2e/end2end/lanes-out
+          if-no-files-found: ignore
