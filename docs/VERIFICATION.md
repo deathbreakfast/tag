@@ -39,7 +39,7 @@ Success line: `protected_tag_host: OK — /tag deny/allow + catalog + ManyToMany
 ### PR CI parity (`.github/workflows/ci.yml`)
 
 Standalone checkout on `unified-field-dev/tag`. UF deps use git `branch = "main"`.
-No monorepo sibling clones. `tag-app` hydrate and Playwright are **not** CI jobs.
+No monorepo sibling clones. `tag-app` hydrate is not a CI job; the `e2e` job runs the Layer 2 Playwright suite.
 
 | Job | Commands |
 |-----|----------|
@@ -110,12 +110,14 @@ Chromium Playwright. No Mailpit / OIDC / SMS. Scenario catalog:
 ```bash
 export CARGO_BUILD_JOBS=1
 export CARGO_TARGET_DIR=target-tag
-cd examples/tag-ui-e2e/end2end && npm ci && npx playwright install chromium && cd ../../..
-cargo leptos end-to-end --project tag-ui-e2e
+cd examples/tag-ui-e2e/end2end && LANES=4 ./run-lanes.sh
 ```
 
-Host listens on `127.0.0.1:3160`. Do **not** Ctrl-C; the run exits when
-Playwright finishes.
+`run-lanes.sh` builds the lab host, installs npm deps and Chromium, starts one
+server per lane (ports `3261`+), and exits non-zero on a failed build or any
+failed, missing or duplicated test. The CI `e2e` job runs the same command.
+Don't use `cargo leptos end-to-end`: it exits 0 when the build fails or the run
+is killed.
 
 Validating scenarios (happy + sad):
 
