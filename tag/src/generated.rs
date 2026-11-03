@@ -16,7 +16,7 @@ use crate::privacy_policies::{TAG_DATA_OWNER, TAG_READ_ACTIVE_SERVICE_USER, TAG_
 #[cfg(feature = "ssr")]
 use crate::side_effects::history_writer::TagHistoryWriter;
 #[cfg(feature = "ssr")]
-use valence::privacy_policies::common::{AUTHENTICATED, BLOCK_ALL, SYSTEM_ONLY};
+use valence::privacy_policies::common::{BLOCK_ALL, SYSTEM_ONLY};
 
 #[cfg(feature = "ssr")]
 include!(concat!(env!("OUT_DIR"), "/generated_models.rs"));
