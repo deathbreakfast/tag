@@ -66,6 +66,8 @@ jobs:
           --test tag_service_integration
           --test privacy_policy_integration
           --test tag_unique_name
+      - name: cargo test (tag-app unit tests)
+        run: cargo test -p tag-app --features ssr --lib
       - name: cargo check + run (protected-tag-host)
         run: |
           cargo check -p protected-tag-host
