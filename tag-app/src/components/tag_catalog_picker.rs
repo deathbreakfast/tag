@@ -326,6 +326,7 @@ mod tests {
             title: title.into(),
             description: None,
             kind: "tag".into(),
+            image_url: None,
         }
     }
 
