@@ -59,6 +59,7 @@ pub fn catalog_items_from_list(
             title: row.name,
             description: row.taxonomy,
             kind: "tag".to_string(),
+            image_url: None,
         })
         .collect()
 }
