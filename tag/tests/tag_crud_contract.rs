@@ -260,7 +260,7 @@ async fn list_tags_search_miss_empty_sad() {
 
 #[tokio::test]
 async fn authenticated_peer_can_read_and_list_other_users_tag_happy_path() {
-    // Shared DB + distinct actors (TG-03): catalog read is AUTHENTICATED (TG-01).
+    // Shared DB + distinct actors (TG-03): catalog read is TAG_SIGNED_IN_USER (TG-01).
     let base = setup_shared_db().await;
     let owner_v = as_user(&base, TEST_USER_A);
     let peer_v = as_user(&base, TEST_USER_B);
