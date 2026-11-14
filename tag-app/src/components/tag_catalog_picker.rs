@@ -67,6 +67,11 @@ pub fn TagCatalogPicker(
     /// Offer `<text> (new)` to create a missing tag (default `true`).
     #[prop(default = true)]
     allow_create: bool,
+    /// Show the "Manage tags" link under the picker (default `true`). Hosts
+    /// that line the picker up with other controls in a row turn it off and
+    /// place their own link beside the field.
+    #[prop(default = true)]
+    manage_link: bool,
 ) -> impl IntoView {
     let manage_href = manage_tags_href.unwrap_or_else(|| "/tag".to_string());
     let query = RwSignal::new(String::new());
@@ -149,11 +154,13 @@ pub fn TagCatalogPicker(
                     </div>
                 })}
             </TagPicker>
-            <div data-testid="tag-catalog-picker-manage">
-                <A href=manage_href>
-                    <Caption1>"Manage tags →"</Caption1>
-                </A>
-            </div>
+            {manage_link.then(|| view! {
+                <div data-testid="tag-catalog-picker-manage">
+                    <A href=manage_href>
+                        <Caption1>"Manage tags →"</Caption1>
+                    </A>
+                </div>
+            })}
             {move || error.get().map(|msg| view! {
                 <Caption1>{msg}</Caption1>
             })}
