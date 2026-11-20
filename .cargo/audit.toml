@@ -3,4 +3,5 @@
 # same ignore already used in higgs/deny.toml elsewhere in the fleet).
 # RUSTSEC-2026-0459: libsqlite3-sys 0.30.1 via sqlx 0.8.6 (uf-valence-backend-sql); fix needs an upstream sqlx/valence bump to libsqlite3-sys >= 0.39.
 # paste/proc-macro-error2: unmaintained, transitive via leptos; matches deny.toml.
-ignore = ["RUSTSEC-2023-0071", "RUSTSEC-2024-0436", "RUSTSEC-2026-0173", "RUSTSEC-2026-0459"]
+# RUSTSEC-2026-0543: chrono unmaintained, no fixed release; transitive via boson-core (security:RUSTSEC-2026-0543).
+ignore = ["RUSTSEC-2023-0071", "RUSTSEC-2024-0436", "RUSTSEC-2026-0173", "RUSTSEC-2026-0459", "RUSTSEC-2026-0543"]
