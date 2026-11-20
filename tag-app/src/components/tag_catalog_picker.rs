@@ -72,8 +72,13 @@ pub fn TagCatalogPicker(
     /// place their own link beside the field.
     #[prop(default = true)]
     manage_link: bool,
+    /// Accessible name for the search input (default "Tags"). Set it when the
+    /// picker chooses something narrower, such as "Graph colour tags".
+    #[prop(optional, into)]
+    aria_label: Option<String>,
 ) -> impl IntoView {
     let manage_href = manage_tags_href.unwrap_or_else(|| "/tag".to_string());
+    let aria_label = StoredValue::new(aria_label.unwrap_or_else(|| "Tags".to_string()));
     let query = RwSignal::new(String::new());
     let create_open = RwSignal::new(false);
     let create_name = RwSignal::new(String::new());
@@ -130,7 +135,10 @@ pub fn TagCatalogPicker(
                     {move || {
                         input_generation.track();
                         view! {
-                            <TagPickerInput on_search=Callback::new(move |q: String| query.set(q)) />
+                            <TagPickerInput
+                                attr:aria-label=aria_label.get_value()
+                                on_search=Callback::new(move |q: String| query.set(q))
+                            />
                         }
                     }}
                 </TagPickerControl>
