@@ -59,8 +59,9 @@
 //!
 //! ## Embed tag catalog picker
 //!
-//! [`TagCatalogPicker`] combines Orbital `TagPicker` with Tag's registered
-//! catalog search source so product forms can multi-select shared labels.
+//! [`TagCatalogPicker`] combines Orbital `ChipSelector` with Tag's registered
+//! catalog search source so product forms can multi-select shared labels. The
+//! picked tags sit as chips inside the input, each with its own remove button.
 //! Embed on any authenticated page where you store tag ids on a connection or
 //! association field.
 //!
@@ -95,8 +96,9 @@
 //! On success the picker searches the catalog through
 //! [`search_tag_catalog`](server::search_tag_catalog) as the user types and
 //! reflects picks in `selected`. `manage_tags_href` defaults to `/tag` for
-//! admins who need the full catalog UI. See [`TagCatalogPicker`] rustdoc for
-//! prop contracts.
+//! admins who need the full catalog UI. Set `link_chips=true` to make each
+//! chip's name open its tag page, and `size` to match the fields around it
+//! (default `Large`). See [`TagCatalogPicker`] rustdoc for prop contracts.
 //!
 //! ### Create a tag from the picker
 //!

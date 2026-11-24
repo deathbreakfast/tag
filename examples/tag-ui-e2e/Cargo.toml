@@ -39,6 +39,7 @@ tower-sessions = { workspace = true, optional = true }
 any_spawner = { version = "0.3", features = ["tokio"], optional = true }
 uf-integrations = { workspace = true, default-features = false }
 uf-product = { workspace = true, default-features = false }
+uf-search-core = { workspace = true, default-features = false }
 valence = { workspace = true, optional = true }
 wasm-bindgen = { workspace = true, optional = true }
 

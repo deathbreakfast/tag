@@ -6,6 +6,7 @@ mod app;
 mod e2e_valence;
 mod gate_demos;
 mod harness_auth_menu;
+mod picker_demo;
 #[cfg(feature = "ssr")]
 pub mod seed;
 mod tag_routes_eager;
