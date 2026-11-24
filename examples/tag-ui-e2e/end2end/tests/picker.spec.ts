@@ -23,7 +23,11 @@ const option = (page: Page, name: string): Locator =>
   page.locator(".orbital-tag-picker-option", { hasText: name });
 const lastChange = (page: Page) => demo(page).getByTestId("tag-picker-demo-change");
 
-/** Open the option list (it opens on a click, not on typing) and type `text`. */
+/**
+ * Open the option list (it opens on a click, not on typing) and type `text`.
+ * Keep `text` free of spaces: in an open multi-select TagPicker, Space picks
+ * the highlighted option instead of typing.
+ */
 async function search(page: Page, text: string) {
   await input(page).click();
   await input(page).pressSequentially(text);
@@ -56,7 +60,8 @@ for (const look of LOOKS) {
     test(`pw-tag-picker-pick-happy [${look.name}]`, async ({ page }) => {
       const { fixture } = await openDemo(page, "none");
       await expect(chips(page)).toHaveCount(0);
-      await search(page, fixture.name);
+      // The seeded name ends in a unique timestamp; search by that alone.
+      await search(page, fixture.name.split(" ").pop()!);
       await option(page, fixture.name).click();
       await expect(control(page).locator(".orbital-tag")).toHaveCount(1);
       await expect(chips(page)).toHaveText(fixture.name);
@@ -112,7 +117,7 @@ for (const look of LOOKS) {
 
     test(`pw-tag-picker-create-happy [${look.name}]`, async ({ page }) => {
       await openDemo(page, "none");
-      const name = `Picker New ${Date.now()}`;
+      const name = `PickerNew${Date.now()}`;
       await search(page, name);
       await option(page, `${name} (new)`).click();
       const dialog = page.getByTestId("tag-create-dialog");
