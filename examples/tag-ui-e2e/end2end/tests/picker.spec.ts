@@ -23,6 +23,12 @@ const option = (page: Page, name: string): Locator =>
   page.locator(".orbital-tag-picker-option", { hasText: name });
 const lastChange = (page: Page) => demo(page).getByTestId("tag-picker-demo-change");
 
+/** Open the option list (it opens on a click, not on typing) and type `text`. */
+async function search(page: Page, text: string) {
+  await input(page).click();
+  await input(page).pressSequentially(text);
+}
+
 /** Seed the owner session (plus `extra` owner tags), then open the demo with `selected` chips. */
 async function openDemo(page: Page, selected: "fixture" | "extra" | "none", extra = 0) {
   const res = await page.request.post("/api/test/seed-data", {
@@ -50,7 +56,7 @@ for (const look of LOOKS) {
     test(`pw-tag-picker-pick-happy [${look.name}]`, async ({ page }) => {
       const { fixture } = await openDemo(page, "none");
       await expect(chips(page)).toHaveCount(0);
-      await input(page).fill(fixture.name);
+      await search(page, fixture.name);
       await option(page, fixture.name).click();
       await expect(control(page).locator(".orbital-tag")).toHaveCount(1);
       await expect(chips(page)).toHaveText(fixture.name);
@@ -107,7 +113,7 @@ for (const look of LOOKS) {
     test(`pw-tag-picker-create-happy [${look.name}]`, async ({ page }) => {
       await openDemo(page, "none");
       const name = `Picker New ${Date.now()}`;
-      await input(page).fill(name);
+      await search(page, name);
       await option(page, `${name} (new)`).click();
       const dialog = page.getByTestId("tag-create-dialog");
       await expect(dialog).toBeVisible({ timeout: 30_000 });
