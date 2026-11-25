@@ -129,17 +129,19 @@ pub fn TagCatalogPicker(
         create_offer_text(&q, &results.read(), &selected.read(), allow_create)
     });
 
-    let options = Signal::derive(move || {
-        let offer = create_offer.get();
-        if let Some(text) = &offer {
-            offered_name.set_value(text.clone());
+    Effect::new(move |_| {
+        if let Some(text) = create_offer.get() {
+            offered_name.set_value(text);
         }
+    });
+
+    let options = Signal::derive(move || {
         chip_options(
             &results.read(),
             &selected.read(),
             &labels.read(),
             chip_href_base.as_deref(),
-            offer.as_deref(),
+            create_offer.get().as_deref(),
         )
     });
 
