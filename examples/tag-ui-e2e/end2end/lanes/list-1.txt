@@ -4,3 +4,13 @@ catalog.spec.ts › pw-tag-create › pw-tag-create-happy
 catalog.spec.ts › pw-tag-detail › pw-tag-update-happy
 catalog.spec.ts › pw-tag-detail › pw-tag-delete-happy
 catalog.spec.ts › pw-tag-detail › pw-tag-not-found-sad
+picker.spec.ts › pw-tag-picker [desktop-light] › pw-tag-picker-pick-happy [desktop-light]
+picker.spec.ts › pw-tag-picker [desktop-light] › pw-tag-picker-remove-last-happy [desktop-light]
+picker.spec.ts › pw-tag-picker [desktop-light] › pw-tag-picker-many-wrap-happy [desktop-light]
+picker.spec.ts › pw-tag-picker [desktop-light] › pw-tag-picker-link-happy [desktop-light]
+picker.spec.ts › pw-tag-picker [desktop-light] › pw-tag-picker-dismiss-sad [desktop-light]
+picker.spec.ts › pw-tag-picker [desktop-light] › pw-tag-picker-create-happy [desktop-light]
+picker.spec.ts › pw-tag-picker [desktop-light] › pw-tag-picker-axe-happy [desktop-light]
+picker.spec.ts › pw-tag-picker [desktop-dark] › pw-tag-picker-pick-happy [desktop-dark]
+picker.spec.ts › pw-tag-picker [desktop-dark] › pw-tag-picker-remove-last-happy [desktop-dark]
+picker.spec.ts › pw-tag-picker [desktop-dark] › pw-tag-picker-many-wrap-happy [desktop-dark]

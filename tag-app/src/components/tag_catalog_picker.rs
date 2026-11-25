@@ -1,4 +1,4 @@
-//! Multi-select tag catalog picker (Orbital `TagPicker` + tag search source).
+//! Multi-select tag catalog picker (Orbital `ChipSelector` + tag search source).
 
 use std::collections::HashMap;
 
@@ -8,10 +8,7 @@ use leptos_router::components::A;
 use orbital_macros::component_doc;
 use tag::types::TagDetailDto;
 use tag::{normalize_name_key, TagSearchSourceId};
-use uf_product::components::{
-    Caption1, Flex, FlexGap, Tag, TagPicker, TagPickerBind, TagPickerControl, TagPickerGroup,
-    TagPickerInput, TagPickerOption, TagPickerSize,
-};
+use uf_product::components::{Caption1, ChipOption, ChipSelector, Flex, FlexGap, TagPickerSize};
 use uf_search_core::{SearchSourceItem, SearchSourceKey};
 
 use super::TagCreateDialog;
@@ -20,7 +17,7 @@ use crate::server::search_tag_catalog;
 const CATALOG_LIMIT: u32 = 50;
 const CREATE_OPTION_VALUE: &str = "__create";
 
-/// Multi-select shared tag catalog (Orbital `TagPicker` + Tag's registered
+/// Multi-select shared tag catalog (Orbital `ChipSelector` + Tag's registered
 /// search source).
 ///
 /// # When to use
@@ -29,16 +26,23 @@ const CREATE_OPTION_VALUE: &str = "__create";
 /// - Forms where selected tag ids are stored and synced via `on_change`
 /// - Filters over tagged records, with `allow_create=false`
 ///
-/// For custom tag chips or a generic multi-select without the shared catalog, use
-/// **Data Display** (`Tag`, `Tag Group`) and **Inputs** (`Tag Picker`) previews.
+/// For a generic chip field without the shared catalog, use **Inputs**
+/// (`Chip Selector`) in the Orbital previews.
 ///
 /// # Usage
 ///
 /// Bind `selected` to the current tag id list and wire `on_change` to your
-/// connection APIs. Typing in the chip input searches the catalog through
+/// connection APIs. Selected tags show as outlined chips inside the input, each
+/// with its own remove button; the field wraps onto new rows as chips are
+/// added. Typing searches the catalog through
 /// [`search_tag_catalog`](crate::server::search_tag_catalog). Pass `seed` with
 /// the already-attached tags so their chips show names before the first search
-/// returns.
+/// returns. Removing the last chip calls `on_change` with an empty list.
+///
+/// `size` defaults to `Large`, the size Orbital's other chip fields (such as
+/// Magnon's Projects) use. Set `link_chips` to make each chip's name a link to
+/// its tag page (`{manage_tags_href}/{id}`, so `/tag/{id}` by default); the
+/// chip's remove button stays a separate control.
 ///
 /// When nothing selectable matches the typed text and no tag has that name, the
 /// list offers `<text> (new)`. Choosing it opens [`TagCreateDialog`]; the created
@@ -57,7 +61,8 @@ pub fn TagCatalogPicker(
     selected: RwSignal<Vec<String>>,
     /// Called with the full id list whenever the selection changes.
     on_change: Callback<Vec<String>>,
-    /// Link target for "Manage tags" (defaults to `/tag`).
+    /// Link target for "Manage tags" (defaults to `/tag`). Linked chips point
+    /// at `{manage_tags_href}/{id}`.
     #[prop(optional, into)]
     manage_tags_href: Option<String>,
     /// Known tags (for example the ones already attached) used to label chips
@@ -76,13 +81,22 @@ pub fn TagCatalogPicker(
     /// picker chooses something narrower, such as "Graph colour tags".
     #[prop(optional, into)]
     aria_label: Option<String>,
+    /// Control size (default `Large`, as on Orbital's other chip fields).
+    #[prop(default = TagPickerSize::Large.into(), into)]
+    size: Signal<TagPickerSize>,
+    /// Link each chip's name to its tag page (default `false`).
+    #[prop(default = false)]
+    link_chips: bool,
 ) -> impl IntoView {
     let manage_href = manage_tags_href.unwrap_or_else(|| "/tag".to_string());
-    let aria_label = StoredValue::new(aria_label.unwrap_or_else(|| "Tags".to_string()));
+    let chip_href_base = link_chips.then(|| manage_href.trim_end_matches('/').to_string());
+    let aria_label = aria_label.unwrap_or_else(|| "Tags".to_string());
     let query = RwSignal::new(String::new());
     let create_open = RwSignal::new(false);
     let create_name = RwSignal::new(String::new());
-    let input_generation = RwSignal::new(0u32);
+    // Text of the last `(new)` row offered. Kept after the pick clears the
+    // query, so the dialog opens with what the user typed.
+    let offered_name = StoredValue::new(String::new());
     let CatalogSearch {
         results,
         results_query,
@@ -91,7 +105,20 @@ pub fn TagCatalogPicker(
     } = CatalogSearch::watch(query, seed);
 
     Effect::new(move |_| {
-        on_change.run(selected.get());
+        let ids = selected.get();
+        // Picking `(new)` lands the placeholder key here for a moment; the
+        // effect below takes it out again, and that change reports the list.
+        if !ids.iter().any(|id| id == CREATE_OPTION_VALUE) {
+            on_change.run(ids);
+        }
+    });
+
+    Effect::new(move |_| {
+        if selected.with(|ids| ids.iter().any(|id| id == CREATE_OPTION_VALUE)) {
+            selected.update(|ids| ids.retain(|id| id != CREATE_OPTION_VALUE));
+            create_name.set(offered_name.get_value());
+            create_open.set(true);
+        }
     });
 
     let create_offer = Memo::new(move |_| {
@@ -100,6 +127,22 @@ pub fn TagCatalogPicker(
             return None;
         }
         create_offer_text(&q, &results.read(), &selected.read(), allow_create)
+    });
+
+    Effect::new(move |_| {
+        if let Some(text) = create_offer.get() {
+            offered_name.set_value(text);
+        }
+    });
+
+    let options = Signal::derive(move || {
+        chip_options(
+            &results.read(),
+            &selected.read(),
+            &labels.read(),
+            chip_href_base.as_deref(),
+            create_offer.get().as_deref(),
+        )
     });
 
     let on_created = Callback::new(move |tag: TagDetailDto| {
@@ -111,57 +154,26 @@ pub fn TagCatalogPicker(
                 ids.push(tag.id);
             }
         });
-        query.set(String::new());
-        input_generation.update(|n| *n = n.wrapping_add(1));
     });
+
+    let empty_placeholder = if allow_create {
+        "No tags. Search or create one"
+    } else {
+        "No tags. Search tags"
+    };
 
     view! {
         <div data-testid="tag-catalog-picker">
             <Flex vertical=true gap=FlexGap::Small>
-            <TagPicker bind=TagPickerBind::new(selected) size=Signal::from(TagPickerSize::Medium)>
-                <TagPickerControl slot>
-                    <TagPickerGroup>
-                        <For
-                            each=move || selected.get()
-                            key=|id| id.clone()
-                            let:id
-                        >
-                            <Tag value=id.clone()>
-                                {move || label_for(&labels.read(), &id)}
-                            </Tag>
-                        </For>
-                    </TagPickerGroup>
-                    // Re-mounting the input is how the typed text clears after an inline create.
-                    {move || {
-                        input_generation.track();
-                        view! {
-                            <TagPickerInput
-                                attr:aria-label=aria_label.get_value()
-                                on_search=Callback::new(move |q: String| query.set(q))
-                            />
-                        }
-                    }}
-                </TagPickerControl>
-                <For
-                    each=move || results.get()
-                    key=|item| item.id.clone()
-                    let:item
-                >
-                    <TagPickerOption value=item.id.clone() text=item.title />
-                </For>
-                {move || create_offer.get().map(|text| view! {
-                    <div data-testid="tag-catalog-picker-create-option">
-                        <TagPickerOption
-                            value=CREATE_OPTION_VALUE.to_string()
-                            text=format!("{text} (new)")
-                            on_activate=Callback::new(move |()| {
-                                create_name.set(text.clone());
-                                create_open.set(true);
-                            })
-                        />
-                    </div>
-                })}
-            </TagPicker>
+            <ChipSelector
+                bind=selected
+                options
+                size
+                placeholder="Add a tag"
+                empty_placeholder=empty_placeholder
+                aria_label=aria_label
+                on_search=Callback::new(move |q: String| query.set(q))
+            />
             {manage_link.then(|| view! {
                 <div data-testid="tag-catalog-picker-manage">
                     <A href=manage_href>
@@ -300,6 +312,40 @@ fn label_for(cache: &HashMap<String, String>, id: &str) -> String {
     cache.get(id).cloned().unwrap_or_else(|| id.to_string())
 }
 
+/// Options for the chip selector: the newest search rows, then any selected
+/// tag the rows left out (so its chip keeps its name), then the `(new)` row.
+fn chip_options(
+    results: &[SearchSourceItem],
+    selected: &[String],
+    labels: &HashMap<String, String>,
+    href_base: Option<&str>,
+    create_offer: Option<&str>,
+) -> Vec<ChipOption> {
+    let option = |id: &str, text: String| {
+        let option = ChipOption::new(id, text);
+        match href_base {
+            Some(base) => option.href(format!("{base}/{id}")),
+            None => option,
+        }
+    };
+    let mut options: Vec<ChipOption> = results
+        .iter()
+        .map(|item| option(&item.id, item.title.clone()))
+        .collect();
+    for id in selected {
+        if id != CREATE_OPTION_VALUE && !results.iter().any(|item| &item.id == id) {
+            options.push(option(id, label_for(labels, id)));
+        }
+    }
+    if let Some(text) = create_offer {
+        options.push(ChipOption::new(
+            CREATE_OPTION_VALUE,
+            format!("{text} (new)"),
+        ));
+    }
+    options
+}
+
 /// The trimmed text to offer as `<text> (new)`, if the picker should offer it.
 ///
 /// Offered only when creating is allowed, the text isn't blank, no unselected
@@ -329,7 +375,10 @@ fn create_offer_text(
 
 #[cfg(test)]
 mod tests {
-    use super::{create_offer_text, label_for, remember_labels, CatalogSearch, RequestSequence};
+    use super::{
+        chip_options, create_offer_text, label_for, remember_labels, CatalogSearch,
+        RequestSequence, CREATE_OPTION_VALUE,
+    };
     use leptos::prelude::*;
     use std::collections::HashMap;
     use uf_search_core::SearchSourceItem;
@@ -416,6 +465,65 @@ mod tests {
     #[test]
     fn no_create_when_allow_create_false_sad() {
         assert!(create_offer_text("Groceries", &[], &[], false).is_none());
+    }
+
+    #[test]
+    fn chip_options_keep_selected_labels_happy() {
+        let mut labels = HashMap::new();
+        remember_labels(&mut labels, &[item("7", "Seeded")]);
+        let options = chip_options(&[item("1", "Finance")], &["7".into()], &labels, None, None);
+        let pairs: Vec<_> = options
+            .iter()
+            .map(|o| (o.value.as_str(), o.text.as_str()))
+            .collect();
+        assert_eq!(pairs, [("1", "Finance"), ("7", "Seeded")]);
+        assert!(options.iter().all(|o| o.href.is_none()));
+    }
+
+    #[test]
+    fn chip_options_selected_in_results_not_repeated_happy() {
+        let options = chip_options(
+            &[item("1", "Finance")],
+            &["1".into()],
+            &HashMap::new(),
+            None,
+            None,
+        );
+        assert_eq!(options.len(), 1);
+    }
+
+    #[test]
+    fn chip_options_link_to_tag_page_happy() {
+        let options = chip_options(
+            &[item("1", "Finance")],
+            &["9".into()],
+            &HashMap::new(),
+            Some("/tag"),
+            None,
+        );
+        let hrefs: Vec<_> = options.iter().map(|o| o.href.as_deref()).collect();
+        assert_eq!(hrefs, [Some("/tag/1"), Some("/tag/9")]);
+    }
+
+    #[test]
+    fn chip_options_create_row_last_and_unlinked_happy() {
+        let options = chip_options(&[], &[], &HashMap::new(), Some("/tag"), Some("Groceries"));
+        assert_eq!(options.len(), 1);
+        assert_eq!(options[0].value, CREATE_OPTION_VALUE);
+        assert_eq!(options[0].text, "Groceries (new)");
+        assert!(options[0].href.is_none());
+    }
+
+    #[test]
+    fn chip_options_skip_create_key_in_selection_sad() {
+        let options = chip_options(
+            &[],
+            &[CREATE_OPTION_VALUE.into()],
+            &HashMap::new(),
+            None,
+            None,
+        );
+        assert!(options.is_empty());
     }
 
     /// A search state and one in-flight ticket, created under `owner`.
