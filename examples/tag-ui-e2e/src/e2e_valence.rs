@@ -252,3 +252,25 @@ pub async fn seed_fresh_owner_tag(name: &str) -> anyhow::Result<FixtureIds> {
     store_fixtures(fixtures.clone());
     Ok(fixtures)
 }
+
+/// Mint owner-owned catalog rows with the given names. Returns `(id, name)` pairs.
+pub async fn seed_owner_tags(names: &[String]) -> anyhow::Result<Vec<(String, String)>> {
+    let system = e2e_system_valence();
+    let owner_ctx = system.with_actor(Actor::User {
+        user_id: "owner".to_string(),
+    });
+    let mut created = Vec::with_capacity(names.len());
+    for name in names {
+        let tag = tag::create(
+            TagCreateInput {
+                name: name.clone(),
+                taxonomy: Some("spend".into()),
+                description: Some("picker e2e seed".into()),
+            },
+            &owner_ctx,
+        )
+        .await?;
+        created.push((tag.id, name.clone()));
+    }
+    Ok(created)
+}

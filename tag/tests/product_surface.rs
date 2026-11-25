@@ -301,7 +301,8 @@ fn catalog_picker_search_binding_happy_path() {
         "TagSearchSourceId::Catalog",
         "tag-catalog-picker-manage",
         "on_search",
-        "tag-catalog-picker-create-option",
+        "CREATE_OPTION_VALUE",
+        "ChipSelector",
         "TagCreateDialog",
     ] {
         assert!(

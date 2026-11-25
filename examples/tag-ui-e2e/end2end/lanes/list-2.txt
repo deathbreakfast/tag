@@ -3,3 +3,14 @@ auth.spec.ts › pw-tag-auth › pw-tag-unverified-gate-sad
 history.spec.ts › pw-tag-history › pw-tag-history-created-on-detail-happy
 history.spec.ts › pw-tag-history › pw-tag-history-after-update-happy
 history.spec.ts › pw-tag-history › pw-tag-create-writes-history-happy
+picker.spec.ts › pw-tag-picker [phone] › pw-tag-picker-pick-happy [phone]
+picker.spec.ts › pw-tag-picker [phone] › pw-tag-picker-remove-last-happy [phone]
+picker.spec.ts › pw-tag-picker [phone] › pw-tag-picker-many-wrap-happy [phone]
+picker.spec.ts › pw-tag-picker [phone] › pw-tag-picker-link-happy [phone]
+picker.spec.ts › pw-tag-picker [phone] › pw-tag-picker-dismiss-sad [phone]
+picker.spec.ts › pw-tag-picker [phone] › pw-tag-picker-create-happy [phone]
+picker.spec.ts › pw-tag-picker [phone] › pw-tag-picker-axe-happy [phone]
+picker.spec.ts › pw-tag-picker [desktop-dark] › pw-tag-picker-link-happy [desktop-dark]
+picker.spec.ts › pw-tag-picker [desktop-dark] › pw-tag-picker-dismiss-sad [desktop-dark]
+picker.spec.ts › pw-tag-picker [desktop-dark] › pw-tag-picker-create-happy [desktop-dark]
+picker.spec.ts › pw-tag-picker [desktop-dark] › pw-tag-picker-axe-happy [desktop-dark]

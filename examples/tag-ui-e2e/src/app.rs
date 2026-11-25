@@ -14,6 +14,7 @@ use uf_product::{orbital_shell, OrbitalTemplate};
 
 use crate::gate_demos::E2eAuthProvider;
 use crate::harness_auth_menu::HarnessAuthMenu;
+use crate::picker_demo::TagPickerDemoPage;
 use crate::tag_routes_eager::TagRoutesEager;
 
 /// SSR document shell.
@@ -39,6 +40,7 @@ pub fn App() -> impl IntoView {
                 <Router>
                     <Routes fallback=|| view! { <p>"Not found"</p> }>
                         <Route path=path!("/") view=HomePage/>
+                        <Route path=path!("/dev/tag-picker") view=TagPickerDemoPage/>
                         <TagRoutesEager />
                     </Routes>
                 </Router>
