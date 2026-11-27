@@ -1,16 +1,12 @@
 //! Tag catalog table rows.
 
-use chrono::{DateTime, Utc};
 use leptos::prelude::*;
 use leptos_router::components::A;
 use tag::types::TagRowDto;
 use uf_product::components::{
     Button, ButtonAppearance, Table, TableBody, TableCell, TableHeader, TableHeaderCell, TableRow,
 };
-
-fn format_updated(at: DateTime<Utc>) -> String {
-    at.format("%Y-%m-%d").to_string()
-}
+use uf_product::primitives::{Timestamp, TimestampStyle};
 
 /// Tag catalog table: name, taxonomy, owner, updated date, and an edit link per row.
 #[component]
@@ -38,7 +34,9 @@ pub(crate) fn TagListTable(items: Vec<TagRowDto>) -> impl IntoView {
                             {row.taxonomy.clone().unwrap_or_else(|| "—".to_string())}
                         </TableCell>
                         <TableCell>{row.owner_display.clone()}</TableCell>
-                        <TableCell>{format_updated(row.updated_at)}</TableCell>
+                        <TableCell attr:data-testid="tag-row-updated">
+                            <Timestamp value=row.updated_at style=TimestampStyle::Date />
+                        </TableCell>
                         <TableCell>
                             <span attr:data-testid=format!("tag-row-edit-{}", row.id)>
                                 <A href=format!("/tag/{}", row.id)>

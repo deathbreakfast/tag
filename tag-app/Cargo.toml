@@ -22,7 +22,6 @@ icondata = { workspace = true }
 
 thiserror = { workspace = true }
 
-chrono = { workspace = true }
 tracing = { workspace = true }
 
 # Non-optional: `valence::RecordId` is part of the featureless/hydrate API surface

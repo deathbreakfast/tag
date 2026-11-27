@@ -11,6 +11,13 @@ test.describe("pw-tag-list", () => {
     await expect(page.getByText(fixtures.tag_name, { exact: true })).toBeVisible({
       timeout: 60_000,
     });
+    // Updated renders through Orbital Timestamp: the date in the cell, the
+    // full instant (UTC included) in the hover card.
+    const row = page.getByRole("row").filter({ hasText: fixtures.tag_name });
+    const updated = row.getByTestId("tag-row-updated").locator("time");
+    await expect(updated).toHaveAttribute("datetime", /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/);
+    await updated.hover();
+    await expect(page.getByTestId("timestamp-card-utc").first()).toBeVisible();
   });
 
   test("pw-tag-search-miss-sad", async ({ page }) => {

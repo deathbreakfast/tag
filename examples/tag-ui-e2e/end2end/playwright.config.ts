@@ -15,6 +15,8 @@ export default defineConfig({
     actionTimeout: 15_000,
     navigationTimeout: 24_000,
     ...devices["Desktop Chrome"],
+    // Timestamps render in the viewer's zone; pin it so text stays stable.
+    timezoneId: "UTC",
     ...(headed
       ? {
           launchOptions: {
